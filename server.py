@@ -9,32 +9,31 @@ import pygame
 from queue import Queue  # Fila para comunicação entre threads
 
 # --- Constantes do Jogo ---
-SCREEN_WIDTH = 1280
-SCREEN_HEIGHT = 720
+SCREEN_WIDTH = 1280;
+SCREEN_HEIGHT = 720;
 FPS = 60
-HEADER_LENGTH = 10
+HEADER_LENGTH = 10;
 MAX_PLAYERS = 4
-SPAWN_INTERVAL = 120  # 2 segundos (a 60 FPS)
-MONEY_INTERVAL = 60  # 1 segundo (a 60 FPS)
+SPAWN_INTERVAL = 120;
+MONEY_INTERVAL = 60
 
 # --- Cores ---
-RED = (255, 0, 0)
-BLUE = (0, 0, 255)
+RED = (255, 0, 0);
+BLUE = (0, 0, 255);
 LIME_GREEN = (50, 255, 50)
-MAGENTA = (255, 0, 255)
+MAGENTA = (255, 0, 255);
 GOLD = (255, 215, 0)
 
 # --- Raridades ---
 RARITIES = ["Descartável", "Reutilizável", "Colecionável", "Premium", "Artefato"]
 RARITY_COLORS = {
-    "Descartável": (150, 150, 150), "Reutilizável": (0, 200, 0),
-    "Colecionável": (0, 100, 255), "Premium": (150, 0, 200),
-    "Artefato": (255, 150, 0)
+    "Descartável": (150, 150, 150), "Reutilizável": (0, 200, 0), "Colecionável": (0, 100, 255),
+    "Premium": (150, 0, 200), "Artefato": (255, 150, 0)
 }
 RARITY_WEIGHTS = [50, 30, 15, 4, 1]
 
 # --- Templates das Garrafas ---
-# (Omitido para economizar espaço - são os mesmos de antes)
+# (Omitido - igual antes)
 BOTTLE_TEMPLATES = [
     {"name": "Água de Torneira", "rarity": "Descartável", "value": 5, "income": 0.1},
     {"name": "Garrafinha Comum", "rarity": "Descartável", "value": 7, "income": 0.15},
@@ -58,19 +57,15 @@ BOTTLE_TEMPLATES = [
     {"name": "Hidromel dos Deuses", "rarity": "Artefato", "value": 700, "income": 30.0}
 ]
 
-# --- Configuração das Lojas ---
+# --- Configurações ---
 CONVEYOR_Y = SCREEN_HEIGHT // 2 - 30
-conveyor_rect_data = (0, CONVEYOR_Y, SCREEN_WIDTH, 60)
+conveyor_rect_data = (0, CONVEYOR_Y, SCREEN_WIDTH, 60);
 conveyor_speed = 2
-
-# Bases
 base_width, base_height = 250, 100
 player_base_rects_data = [
     (50, 50, base_width, base_height), (SCREEN_WIDTH - 300, 50, base_width, base_height),
     (50, CONVEYOR_Y + 70, base_width, base_height), (SCREEN_WIDTH - 300, CONVEYOR_Y + 70, base_width, base_height)
 ]
-
-# Posições Iniciais
 player_start_pos = [(100, 250), (SCREEN_WIDTH - 130, 250), (100, 470), (SCREEN_WIDTH - 130, 470)]
 player_colors = [RED, BLUE, LIME_GREEN, MAGENTA]
 
@@ -83,34 +78,24 @@ SHOP_PACKS_DATA = {
     "Colecionável": {"cost": 100,
                      "rect": (SCREEN_WIDTH // 2 + (PACK_WIDTH * 0.5 + PACK_PADDING), PACK_Y, PACK_WIDTH, PACK_HEIGHT)}
 }
-
-# --- (MUDANÇA) Loja de Upgrades ---
 WEAPON_WIDTH, WEAPON_HEIGHT, WEAPON_Y, WEAPON_PADDING = 180, 80, SCREEN_HEIGHT - 220, 10
-TOTAL_WEAPON_WIDTH = (WEAPON_WIDTH * 3) + (WEAPON_PADDING * 2)
-WEAPON_START_X = (SCREEN_WIDTH - TOTAL_WEAPON_WIDTH) // 2
+WEAPON_START_X = (SCREEN_WIDTH - (WEAPON_WIDTH * 3 + WEAPON_PADDING * 2)) // 2
 WEAPON_SHOP_ITEMS_DATA = {
-    "Tênis": {
-        "cost": 100, "desc": "Velocidade +2",
-        "rect": (WEAPON_START_X, WEAPON_Y, WEAPON_WIDTH, WEAPON_HEIGHT),
-        "type": "passive"
-    },
-    "Bateria Extra": {  # <-- Nome mudou
-        "cost": 250, "desc": "Escudo +15s",  # <-- Descrição mudou
-        "rect": (WEAPON_START_X + WEAPON_WIDTH + WEAPON_PADDING, WEAPON_Y, WEAPON_WIDTH, WEAPON_HEIGHT),
-        "type": "passive"
-    },
-    "Raio Orbital": {
-        "cost": 500, "desc": "Atordoa (3s) + Devolve Item",
-        "rect": (WEAPON_START_X + (WEAPON_WIDTH + WEAPON_PADDING) * 2, WEAPON_Y, WEAPON_WIDTH, WEAPON_HEIGHT),
-        "type": "consumable"
-    }
+    "Tênis": {"cost": 100, "desc": "Velocidade +2", "rect": (WEAPON_START_X, WEAPON_Y, WEAPON_WIDTH, WEAPON_HEIGHT),
+              "type": "passive"},
+    "Bateria Extra": {"cost": 250, "desc": "Escudo +15s",
+                      "rect": (WEAPON_START_X + WEAPON_WIDTH + WEAPON_PADDING, WEAPON_Y, WEAPON_WIDTH, WEAPON_HEIGHT),
+                      "type": "passive"},
+    "Raio Orbital": {"cost": 500, "desc": "Atordoa(3s)+Devolve", "rect": (
+    WEAPON_START_X + (WEAPON_WIDTH + WEAPON_PADDING) * 2, WEAPON_Y, WEAPON_WIDTH, WEAPON_HEIGHT), "type": "consumable"}
 }
 
-# --- Classes do Jogo (Lógica do Servidor) ---
+# --- Classes do Jogo ---
 pygame.init()
 
 
 class Bottle:
+    # (Não mudou)
     def __init__(self, template, is_golden=False):
         self.name = template["name"];
         self.rarity = template["rarity"]
@@ -133,65 +118,59 @@ class Bottle:
 
 
 class Player:
-    def __init__(self, x, y, color, base_rect_data, player_id):
+    # (NOVO) Aceita 'name' no construtor
+    def __init__(self, x, y, color, base_rect_data, player_id, name):
         self.rect = pygame.Rect(x, y, 30, 30)
         self.color = color;
         self.id = player_id;
         self.money = 10.0
+        self.name = name if name else f"Player {player_id + 1}"  # Nome default se vazio
         self.base_rect = pygame.Rect(base_rect_data)
         self.base_speed = 4;
         self.current_speed = self.base_speed
-        self.theft_speed_multiplier = 1.5  # Velocidade quando roubado (sem upgrade)
+        self.theft_speed_multiplier = 1.5
         self.carrying_bottle = None
         self.is_being_stolen_from = False
         self.is_stunned = False;
         self.stun_timer = 0
         self.equipped_slots = [None, None, None]
         self.equipped_slot_positions_data = []
-
-        # --- (MUDANÇA) Upgrades ---
-        self.has_weapon = {"Tênis": False, "Bateria Extra": False}  # Chave mudou
+        self.has_weapon = {"Tênis": False, "Bateria Extra": False}
         self.consumables = {"Raio Orbital": 0}
-
-        # --- (NOVO) Estado do Escudo Detalhado ---
-        self.shield_active = False
-        self.shield_timer = 0
+        self.shield_active = False;
+        self.shield_timer = 0;
         self.shield_cooldown = 0
-        self.base_shield_duration_frames = 30 * FPS  # Duração base
-        self.bonus_shield_duration_frames = 0  # Bônus do upgrade
+        self.base_shield_duration_frames = 30 * FPS
+        self.bonus_shield_duration_frames = 0
         self.shield_button_rect = pygame.Rect(self.base_rect.x + 5, self.base_rect.y + 5, 20, 20)
 
-        # Calcula posições dos slots
         slot_width, slot_height, slot_padding = 40, 50, 20
-        total_width = (3 * slot_width) + (2 * slot_padding)
-        start_x = self.base_rect.centerx - total_width // 2
+        start_x = self.base_rect.centerx - (3 * slot_width + 2 * slot_padding) // 2
         start_y = self.base_rect.centery - slot_height // 2
         for i in range(3):
-            slot_x = start_x + i * (slot_width + slot_padding)
-            rect_data = (slot_x, start_y, slot_width, slot_height)
-            self.equipped_slot_positions_data.append(rect_data)
+            self.equipped_slot_positions_data.append(
+                (start_x + i * (slot_width + slot_padding), start_y, slot_width, slot_height))
 
     def to_dict(self):
-        equipped_slots_data = [b.to_dict() if b else None for b in self.equipped_slots]
-        carrying_bottle_data = self.carrying_bottle.to_dict() if self.carrying_bottle else None
+        # (NOVO) Inclui 'name'
+        equipped = [b.to_dict() if b else None for b in self.equipped_slots]
+        carrying = self.carrying_bottle.to_dict() if self.carrying_bottle else None
         return {
+            "name": self.name,  # <-- Incluído
             "rect_data": (self.rect.x, self.rect.y, self.rect.w, self.rect.h),
             "color": self.color, "id": self.id, "money": self.money,
             "base_rect_data": (self.base_rect.x, self.base_rect.y, self.base_rect.w, self.base_rect.h),
-            "is_stunned": self.is_stunned,
-            "carrying_bottle_data": carrying_bottle_data,
-            "equipped_slots_data": equipped_slots_data,
-            "equipped_slot_positions_data": self.equipped_slot_positions_data,
+            "is_stunned": self.is_stunned, "carrying_bottle_data": carrying,
+            "equipped_slots_data": equipped, "equipped_slot_positions_data": self.equipped_slot_positions_data,
             "has_weapon": self.has_weapon, "consumables": self.consumables,
-            "shield_active": self.shield_active,
-            "shield_timer_frames": self.shield_timer,
+            "shield_active": self.shield_active, "shield_timer_frames": self.shield_timer,
             "shield_cooldown_frames": self.shield_cooldown,
             "shield_button_rect_data": (
             self.shield_button_rect.x, self.shield_button_rect.y, self.shield_button_rect.w, self.shield_button_rect.h)
         }
 
     def move(self, keys_pressed):
-        """Move o jogador usando WASD, independente do ID."""
+        # (Não mudou - já usa WASD)
         if self.is_stunned: return
         dx, dy = 0, 0
         if keys_pressed[pygame.K_w]: dy = -self.current_speed
@@ -203,235 +182,183 @@ class Player:
         self.rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
 
     def update(self, all_players_list):
-        # Lógica dos Timers do Escudo
+        # (Não mudou - escudo e velocidade)
         if self.shield_timer > 0:
             self.shield_timer -= 1
-            if self.shield_timer <= 0:
-                self.shield_active = False
-                print(f"Escudo de P{self.id + 1} desativado.")
-        if self.shield_cooldown > 0:
-            self.shield_cooldown -= 1
-
-        # Lógica de Stun
+            if self.shield_timer <= 0: self.shield_active = False
+        if self.shield_cooldown > 0: self.shield_cooldown -= 1
         if self.is_stunned:
             self.stun_timer -= 1
             if self.stun_timer <= 0: self.is_stunned = False
             return
-
-            # --- (MUDANÇA) Lógica de Velocidade ---
-        # A velocidade de defesa não existe mais
-        self.is_being_stolen_from = False
-        for p in all_players_list:
-            if p and p.carrying_bottle and p.carrying_bottle.owner_id == self.id:
-                self.is_being_stolen_from = True;
-                break
-
-        # Calcula velocidade base (apenas com Tênis)
-        current_base_speed = self.base_speed + 2 if self.has_weapon["Tênis"] else self.base_speed
-
-        # Aplica multiplicador se estiver sendo roubado (sem upgrade de defesa)
-        self.current_speed = current_base_speed * self.theft_speed_multiplier if self.is_being_stolen_from else current_base_speed
-
-        # Atualiza posição da garrafa
-        if self.carrying_bottle:
-            self.carrying_bottle.rect.center = self.rect.center
+        self.is_being_stolen_from = any(
+            p and p.carrying_bottle and p.carrying_bottle.owner_id == self.id for p in all_players_list)
+        base_speed = self.base_speed + 2 if self.has_weapon["Tênis"] else self.base_speed
+        self.current_speed = base_speed * self.theft_speed_multiplier if self.is_being_stolen_from else base_speed
+        if self.carrying_bottle: self.carrying_bottle.rect.center = self.rect.center
 
     def calculate_income(self):
+        # (Não mudou)
         return sum(b.income for b in self.equipped_slots if b)
 
     def handle_interaction(self, conveyor_bottles, all_players_list):
+        # (Não mudou - lógica de interação, compra de Bateria Extra já estava correta)
         if self.is_stunned: return
-        all_other_players = [p for p in all_players_list if p and p != self]
+        others = [p for p in all_players_list if p and p != self]
 
-        # 1. Guardar garrafa
+        # 1. Guardar
         if self.carrying_bottle and self.rect.colliderect(self.base_rect):
-            for i in range(len(self.equipped_slots)):
+            for i in range(3):
                 if self.equipped_slots[i] is None:
-                    self.equipped_slots[i] = self.carrying_bottle
+                    self.equipped_slots[i] = self.carrying_bottle;
                     self.equipped_slots[i].owner_id = self.id
-                    slot_rect_data = self.equipped_slot_positions_data[i]
-                    self.equipped_slots[i].rect.center = (
-                    slot_rect_data[0] + slot_rect_data[2] // 2, slot_rect_data[1] + slot_rect_data[3] // 2)
+                    slot = self.equipped_slot_positions_data[i]
+                    self.equipped_slots[i].rect.center = (slot[0] + slot[2] // 2, slot[1] + slot[3] // 2)
                     self.carrying_bottle = None;
                     return
-        # 2. Recuperar garrafa
-        for other_player in all_other_players:
-            if other_player.carrying_bottle and other_player.carrying_bottle.owner_id == self.id and self.rect.colliderect(
-                    other_player.rect):
-                for i in range(len(self.equipped_slots)):
+        # 2. Recuperar
+        for other in others:
+            if other.carrying_bottle and other.carrying_bottle.owner_id == self.id and self.rect.colliderect(
+                    other.rect):
+                for i in range(3):
                     if self.equipped_slots[i] is None:
-                        self.equipped_slots[i] = other_player.carrying_bottle
-                        slot_rect_data = self.equipped_slot_positions_data[i]
-                        self.equipped_slots[i].rect.center = (
-                        slot_rect_data[0] + slot_rect_data[2] // 2, slot_rect_data[1] + slot_rect_data[3] // 2)
-                        other_player.carrying_bottle = None;
+                        self.equipped_slots[i] = other.carrying_bottle
+                        slot = self.equipped_slot_positions_data[i]
+                        self.equipped_slots[i].rect.center = (slot[0] + slot[2] // 2, slot[1] + slot[3] // 2)
+                        other.carrying_bottle = None;
                         return
-
-        # 3. Tentar Ativar Escudo
-        if self.carrying_bottle is None and self.rect.colliderect(self.shield_button_rect):
+        # 3. Escudo
+        if not self.carrying_bottle and self.rect.colliderect(self.shield_button_rect):
             if self.shield_cooldown <= 0:
                 self.shield_active = True
-                # --- (MUDANÇA) Usa duração base + bônus ---
-                current_duration_frames = self.base_shield_duration_frames + self.bonus_shield_duration_frames
-                self.shield_timer = current_duration_frames
-
-                # --- (MUDANÇA) Cooldown baseado na duração atual ---
-                current_duration_seconds = current_duration_frames // FPS
-                self.shield_cooldown = (current_duration_seconds + 10) * FPS
-
-                print(f"P{self.id + 1} ativou o escudo da base por {current_duration_seconds}s!")
+                duration = self.base_shield_duration_frames + self.bonus_shield_duration_frames
+                self.shield_timer = duration
+                self.shield_cooldown = (duration // FPS + 10) * FPS
+                print(f"{self.name} ativou escudo ({duration // FPS}s)!");
                 return
             else:
-                print(f"P{self.id + 1} tentou usar o escudo, mas está em cooldown ({self.shield_cooldown // FPS}s).")
-                return
-
-                # 4. Vender garrafa
-        if self.carrying_bottle is None and self.rect.colliderect(self.base_rect):
+                print(f"{self.name} escudo em CD ({self.shield_cooldown // FPS}s)"); return
+            # 4. Vender
+        if not self.carrying_bottle and self.rect.colliderect(self.base_rect):
             for i, slot_data in enumerate(self.equipped_slot_positions_data):
                 if self.equipped_slots[i] and self.rect.colliderect(pygame.Rect(slot_data)):
-                    self.money += self.equipped_slots[i].value
+                    self.money += self.equipped_slots[i].value;
                     self.equipped_slots[i] = None;
                     return
-
-        # --- (MUDANÇA) 5. Comprar Upgrades ---
-        if self.carrying_bottle is None:
-            for weapon_name, info in WEAPON_SHOP_ITEMS_DATA.items():
+        # 5. Comprar Upgrades
+        if not self.carrying_bottle:
+            for name, info in WEAPON_SHOP_ITEMS_DATA.items():
                 if self.rect.colliderect(pygame.Rect(info["rect"])):
-                    if self.money < info["cost"]: return  # Sem dinheiro
-
-                    # Verifica se já possui (para passivos)
-                    if info["type"] == "passive" and self.has_weapon.get(weapon_name, False):
-                        print(f"P{self.id + 1} já possui {weapon_name}!")
-                        return
-
-                        # Compra
+                    if self.money < info["cost"]: return
+                    if info["type"] == "passive" and self.has_weapon.get(name, False): return
                     self.money -= info["cost"]
-
                     if info["type"] == "passive":
-                        self.has_weapon[weapon_name] = True
-                        # --- (NOVO) Aplica efeito da Bateria Extra ---
-                        if weapon_name == "Bateria Extra":
-                            self.bonus_shield_duration_frames = 15 * FPS  # Adiciona 15s
-                            print(f"P{self.id + 1} comprou {weapon_name}! Duração do escudo aumentada.")
-                        else:
-                            print(f"P{self.id + 1} comprou {weapon_name}!")
-
+                        self.has_weapon[name] = True
+                        if name == "Bateria Extra": self.bonus_shield_duration_frames = 15 * FPS
                     elif info["type"] == "consumable":
-                        self.consumables[weapon_name] += 1
-                        print(f"P{self.id + 1} comprou +1 {weapon_name}!")
-                    return  # Ação concluída
-
+                        self.consumables[name] += 1
+                    return
         # 6. Comprar Packs
-        if self.carrying_bottle is None:
-            for rarity, pack_info in SHOP_PACKS_DATA.items():
-                if self.rect.colliderect(pygame.Rect(pack_info["rect"])):
-                    if self.money >= pack_info["cost"]:
-                        for i in range(len(self.equipped_slots)):
+        if not self.carrying_bottle:
+            for rarity, info in SHOP_PACKS_DATA.items():
+                if self.rect.colliderect(pygame.Rect(info["rect"])):
+                    if self.money >= info["cost"]:
+                        for i in range(3):
                             if self.equipped_slots[i] is None:
-                                self.money -= pack_info["cost"]
+                                self.money -= info["cost"];
                                 new_bottle = create_bottle_by_rarity(rarity)
-                                self.equipped_slots[i] = new_bottle
+                                self.equipped_slots[i] = new_bottle;
                                 new_bottle.owner_id = self.id
-                                slot_rect_data = self.equipped_slot_positions_data[i]
-                                new_bottle.rect.center = (
-                                slot_rect_data[0] + slot_rect_data[2] // 2, slot_rect_data[1] + slot_rect_data[3] // 2)
+                                slot = self.equipped_slot_positions_data[i]
+                                new_bottle.rect.center = (slot[0] + slot[2] // 2, slot[1] + slot[3] // 2);
                                 return
                     return
-
-        # 7. Roubar (Verifica escudo)
-        if self.carrying_bottle is None:
-            for other_player in all_other_players:
-                if other_player.shield_active and self.rect.colliderect(other_player.base_rect):
-                    print(f"P{self.id + 1} tentou roubar P{other_player.id + 1}, mas o escudo está ativo!")
-                    return
-                if self.rect.colliderect(other_player.base_rect):
-                    for i, slot_data in enumerate(other_player.equipped_slot_positions_data):
-                        if other_player.equipped_slots[i] and self.rect.colliderect(pygame.Rect(slot_data)):
-                            self.carrying_bottle = other_player.equipped_slots[i]
-                            other_player.equipped_slots[i] = None;
+        # 7. Roubar
+        if not self.carrying_bottle:
+            for other in others:
+                if other.shield_active and self.rect.colliderect(other.base_rect): return
+                if self.rect.colliderect(other.base_rect):
+                    for i, slot_data in enumerate(other.equipped_slot_positions_data):
+                        if other.equipped_slots[i] and self.rect.colliderect(pygame.Rect(slot_data)):
+                            self.carrying_bottle = other.equipped_slots[i];
+                            other.equipped_slots[i] = None;
                             return
-
         # 8. Comprar da esteira
-        if self.carrying_bottle is None:
+        if not self.carrying_bottle:
             for bottle in conveyor_bottles:
                 if self.rect.colliderect(bottle.rect):
                     if self.money >= bottle.value:
-                        for i in range(len(self.equipped_slots)):
+                        for i in range(3):
                             if self.equipped_slots[i] is None:
-                                self.money -= bottle.value
+                                self.money -= bottle.value;
                                 self.equipped_slots[i] = bottle
-                                bottle.owner_id = self.id
-                                slot_rect_data = self.equipped_slot_positions_data[i]
-                                bottle.rect.center = (
-                                slot_rect_data[0] + slot_rect_data[2] // 2, slot_rect_data[1] + slot_rect_data[3] // 2)
+                                bottle.owner_id = self.id;
+                                slot = self.equipped_slot_positions_data[i]
+                                bottle.rect.center = (slot[0] + slot[2] // 2, slot[1] + slot[3] // 2)
                                 conveyor_bottles.remove(bottle);
                                 return
                     return
 
     def use_orbital_ray(self, all_players_list):
+        # (Não mudou)
         if self.is_stunned or self.consumables["Raio Orbital"] <= 0: return
-        self.consumables["Raio Orbital"] -= 1
-        closest_enemy, min_dist_sq = None, float('inf')
+        self.consumables["Raio Orbital"] -= 1;
+        closest, min_dist = None, float('inf')
         for enemy in all_players_list:
             if not enemy or enemy == self or enemy.rect.colliderect(enemy.base_rect): continue
-            dist_sq = (enemy.rect.centerx - self.rect.centerx) ** 2 + (enemy.rect.centery - self.rect.centery) ** 2
-            if dist_sq < min_dist_sq: min_dist_sq, closest_enemy = dist_sq, enemy
-        if closest_enemy:
-            closest_enemy.is_stunned = True
-            closest_enemy.stun_timer = FPS * 3
-            if closest_enemy.carrying_bottle:
-                bottle, owner_id = closest_enemy.carrying_bottle, closest_enemy.carrying_bottle.owner_id
-                closest_enemy.carrying_bottle = None
+            dist = (enemy.rect.centerx - self.rect.centerx) ** 2 + (enemy.rect.centery - self.rect.centery) ** 2
+            if dist < min_dist: min_dist, closest = dist, enemy
+        if closest:
+            closest.is_stunned = True;
+            closest.stun_timer = FPS * 3
+            if closest.carrying_bottle:
+                bottle, owner_id = closest.carrying_bottle, closest.carrying_bottle.owner_id
+                closest.carrying_bottle = None
                 owner = next((p for p in all_players_list if p and p.id == owner_id), None)
                 if owner:
-                    for i in range(len(owner.equipped_slots)):
+                    for i in range(3):
                         if owner.equipped_slots[i] is None:
-                            owner.equipped_slots[i] = bottle
-                            slot_rect_data = owner.equipped_slot_positions_data[i]
-                            bottle.rect.center = (
-                            slot_rect_data[0] + slot_rect_data[2] // 2, slot_rect_data[1] + slot_rect_data[3] // 2)
+                            owner.equipped_slots[i] = bottle;
+                            slot = owner.equipped_slot_positions_data[i]
+                            bottle.rect.center = (slot[0] + slot[2] // 2, slot[1] + slot[3] // 2);
                             return
 
 
 # --- Funções Auxiliares do Servidor ---
 def create_bottle_by_rarity(rarity):
-    possible_templates = [t for t in BOTTLE_TEMPLATES if t["rarity"] == rarity]
-    template = random.choice(possible_templates)
+    template = random.choice([t for t in BOTTLE_TEMPLATES if t["rarity"] == rarity])
     return Bottle(template, random.random() < 0.1)
 
 
 def spawn_bottle():
-    rarity_choice = random.choices(RARITIES, weights=RARITY_WEIGHTS, k=1)[0]
-    new_bottle = create_bottle_by_rarity(rarity_choice)
-    conveyor_rect = pygame.Rect(conveyor_rect_data)
-    new_bottle.rect.topleft = (
-    -new_bottle.rect.width, conveyor_rect.y + (conveyor_rect.height // 2 - new_bottle.rect.height // 2))
-    return new_bottle
+    rarity = random.choices(RARITIES, weights=RARITY_WEIGHTS, k=1)[0]
+    bottle = create_bottle_by_rarity(rarity)
+    rect = pygame.Rect(conveyor_rect_data)
+    bottle.rect.topleft = (-bottle.rect.width, rect.y + (rect.height // 2 - bottle.rect.height // 2))
+    return bottle
 
 
-# --- Lógica de Rede (Arquitetura de Filas - Não mudou) ---
-input_queue = Queue()
-output_queues = {}
-client_connections = {}
+# --- Lógica de Rede (Filas - Não mudou) ---
+input_queue = Queue();
+output_queues = {};
+client_connections = {};
 clients_lock = threading.Lock()
 
 
 def client_listener_thread(conn, player_id):
-    """Ouve um cliente e coloca inputs na input_queue."""
-    conn.send(pickle.dumps(player_id))
     print(f"[Thread-{player_id}] Listener iniciada.")
-    while True:
+    while True:  # Loop para receber dados C2S
         try:
             header = conn.recv(HEADER_LENGTH)
             if not header: break
-            message_length = int(header.decode('utf-8').strip())
+            length = int(header.decode('utf-8').strip())
             data = b''
-            while len(data) < message_length:
-                part = conn.recv(min(4096, message_length - len(data)))
+            while len(data) < length:
+                part = conn.recv(min(4096, length - len(data)))
                 if not part: raise ConnectionError("C2S Disconnect")
                 data += part
             input_queue.put((player_id, pickle.loads(data)))
-        except (ConnectionResetError, ConnectionAbortedError, EOFError, ConnectionError):
+        except (ConnectionResetError, ConnectionAbortedError, EOFError, ConnectionError, ValueError):
             break
         except Exception as e:
             print(f"[Erro Listener P{player_id}]: {e}"); break
@@ -440,83 +367,68 @@ def client_listener_thread(conn, player_id):
 
 
 def client_sender_thread(conn, player_id):
-    """Envia o estado do jogo da output_queue para um cliente."""
     print(f"[Thread-{player_id}] Sender iniciada.")
     q = output_queues[player_id]
-    while True:
+    while True:  # Loop para enviar dados S2C
         try:
-            game_state = q.get()
-            if game_state == "disconnect": break
-            pickled_state = pickle.dumps(game_state)
-            header = f"{len(pickled_state):<{HEADER_LENGTH}}".encode('utf-8')
-            conn.sendall(header + pickled_state)
+            state = q.get();
+            if state == "disconnect": break
+            data = pickle.dumps(state)
+            header = f"{len(data):<{HEADER_LENGTH}}".encode('utf-8')
+            conn.sendall(header + data)
         except (ConnectionResetError, ConnectionAbortedError, EOFError):
             break
         except Exception as e:
             print(f"[Erro Sender P{player_id}]: {e}"); break
     print(f"[Thread-{player_id}] Sender encerrada.")
     with clients_lock:
-        client_connections.pop(player_id, None)
-        output_queues.pop(player_id, None)
+        client_connections.pop(player_id, None); output_queues.pop(player_id, None)
     conn.close()
 
 
-# --- Estado Global do Jogo ---
+# --- Estado Global e Lógica Principal ---
 players = [None] * MAX_PLAYERS
 conveyor_bottles = []
 
 
 def game_logic_thread():
-    """Thread única que roda a lógica do jogo."""
     global players, conveyor_bottles
-    clock = pygame.time.Clock()
+    clock = pygame.time.Clock();
     spawn_timer = 0;
     money_timer = 0
     print("[GameLogic] Thread de lógica iniciada.")
-
     while True:
         # 1. Processar Inputs
         while not input_queue.empty():
-            player_id, data = input_queue.get()
+            p_id, data = input_queue.get()
             if data == "disconnect":
-                print(f"[GameLogic] Processando desconexão de P{player_id + 1}")
-                players[player_id] = None
+                print(f"[GameLogic] Desconexão P{p_id + 1}")
+                players[p_id] = None
                 with clients_lock:
-                    if player_id in output_queues: output_queues[player_id].put("disconnect")
+                    if p_id in output_queues: output_queues[p_id].put("disconnect")
                 continue
-            player = players[player_id]
-            if not player: continue
-            player.move(data['keys'])
-            if data['interact']: player.handle_interaction(conveyor_bottles, players)
-            if data['use_item']: player.use_orbital_ray(players)
-
+            player = players[p_id]
+            if player:
+                player.move(data['keys'])
+                if data['interact']: player.handle_interaction(conveyor_bottles, players)
+                if data['use_item']: player.use_orbital_ray(players)
         # 2. Atualizar Estado
-        active_players = [p for p in players if p]
-        for player in active_players: player.update(active_players)
-
-        # Spawner
+        active = [p for p in players if p]
+        for p in active: p.update(active)
         spawn_timer = (spawn_timer + 1) % SPAWN_INTERVAL
-        if spawn_timer == 0 and len(conveyor_bottles) < 15:
-            conveyor_bottles.append(spawn_bottle())
-
-        # Esteira
-        for bottle in conveyor_bottles[:]:
-            bottle.rect.x += conveyor_speed
-            if bottle.rect.left > SCREEN_WIDTH: conveyor_bottles.remove(bottle)
-
-        # Dinheiro
+        if spawn_timer == 0 and len(conveyor_bottles) < 15: conveyor_bottles.append(spawn_bottle())
+        for b in conveyor_bottles[:]:
+            b.rect.x += conveyor_speed
+            if b.rect.left > SCREEN_WIDTH: conveyor_bottles.remove(b)
         money_timer = (money_timer + 1) % MONEY_INTERVAL
         if money_timer == 0:
-            for player in active_players: player.money += player.calculate_income()
-
-        # 3. Preparar e Distribuir Estado
-        players_data = [p.to_dict() if p else None for p in players]
-        bottles_data = [b.to_dict() for b in conveyor_bottles]
-        game_state = {"players": players_data, "conveyor_bottles": bottles_data}
+            for p in active: p.money += p.calculate_income()
+        # 3. Distribuir Estado
+        state = {"players": [p.to_dict() if p else None for p in players],
+                 "conveyor_bottles": [b.to_dict() for b in conveyor_bottles]}
         with clients_lock:
-            for q in output_queues.values(): q.put(game_state)
-
-            # 4. Controla o FPS
+            for q in output_queues.values(): q.put(state)
+            # 4. FPS
         clock.tick(FPS)
 
 
@@ -528,34 +440,49 @@ def main():
     try:
         s.bind((SERVER_IP, PORT));
         s.listen(MAX_PLAYERS)
-        print(f"Servidor iniciado em {SERVER_IP}:{PORT}. Aguardando conexões...")
+        print(f"Servidor iniciado em {SERVER_IP}:{PORT}...")
     except socket.error as e:
-        print(f"Erro ao iniciar o servidor: {str(e)}"); sys.exit()
+        print(f"Erro bind: {e}"); sys.exit()
 
     threading.Thread(target=game_logic_thread, daemon=True).start()
 
     while True:
         conn, addr = s.accept();
-        print(f"Nova conexão de: {addr}")
+        print(f"Conexão de: {addr}")
         new_player_id = -1
         with clients_lock:
             for i in range(MAX_PLAYERS):
                 if players[i] is None and i not in client_connections:
                     new_player_id = i;
                     break
+
         if new_player_id != -1:
-            start_x, start_y = player_start_pos[new_player_id]
-            color = player_colors[new_player_id]
-            base_data = player_base_rects_data[new_player_id]
-            players[new_player_id] = Player(start_x, start_y, color, base_data, new_player_id)
-            with clients_lock:
-                output_queues[new_player_id] = Queue()
-                client_connections[new_player_id] = conn
-            threading.Thread(target=client_listener_thread, args=(conn, new_player_id), daemon=True).start()
-            threading.Thread(target=client_sender_thread, args=(conn, new_player_id), daemon=True).start()
-            print(f"Jogador {new_player_id + 1} (P{new_player_id + 1}) conectado.")
+            try:
+                # --- (NOVO) Recebe nome APÓS enviar ID ---
+                conn.send(pickle.dumps(new_player_id))  # Envia ID
+                player_name_bytes = conn.recv(1024)  # Espera nome (buffer razoável)
+                player_name = pickle.loads(player_name_bytes)
+                print(f"Nome recebido: {player_name}")
+
+                # Cria o jogador COM o nome
+                start_x, start_y = player_start_pos[new_player_id]
+                color = player_colors[new_player_id]
+                base_data = player_base_rects_data[new_player_id]
+                players[new_player_id] = Player(start_x, start_y, color, base_data, new_player_id, player_name)
+
+                # Inicia threads de rede
+                with clients_lock:
+                    output_queues[new_player_id] = Queue()
+                    client_connections[new_player_id] = conn
+                threading.Thread(target=client_listener_thread, args=(conn, new_player_id), daemon=True).start()
+                threading.Thread(target=client_sender_thread, args=(conn, new_player_id), daemon=True).start()
+                print(f"Jogador {new_player_id + 1} ({player_name}) conectado.")
+
+            except Exception as e:
+                print(f"Erro ao inicializar jogador {new_player_id}: {e}")
+                conn.close()  # Fecha a conexão se algo deu errado
         else:
-            print("Servidor cheio. Conexão recusada.");
+            print("Servidor cheio.");
             conn.close()
 
 
