@@ -16,7 +16,7 @@ PORT = 5555
 conveyor_speed = 2
 
 # --- Configurações do Imposto ---
-TAX_INTERVAL = 45 * FPS
+TAX_INTERVAL = 180 * FPS
 TAX_RATE = 0.20
 TAX_MIN_THRESHOLD = 100.0
 
