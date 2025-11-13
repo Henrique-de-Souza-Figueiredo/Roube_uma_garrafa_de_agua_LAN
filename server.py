@@ -2,7 +2,6 @@ import socket
 import threading
 import pickle
 import random
-import math
 import sys
 import time
 import pygame
@@ -15,10 +14,10 @@ conveyor_bottles = []
 game_over = False
 final_ranking = []
 resenha_active = False
+server_running = False  # Controle para fechar thread se necessário
 
 
-# --- Classes do Jogo ---
-
+# --- Classes do Jogo (Bottle e Player) ---
 class Bottle:
     def __init__(self, template, is_golden=False):
         self.name = template["name"]
@@ -33,10 +32,9 @@ class Bottle:
         self.owner_id = None
 
     def to_dict(self):
-        return {"name": self.name, "rarity": self.rarity, "value": self.value,
-                "income": self.income, "is_golden": self.is_golden, "color": self.color,
-                "rect_data": (self.rect.x, self.rect.y, self.rect.w, self.rect.h),
-                "owner_id": self.owner_id}
+        return {"name": self.name, "rarity": self.rarity, "value": self.value, "income": self.income,
+                "is_golden": self.is_golden, "color": self.color,
+                "rect_data": (self.rect.x, self.rect.y, self.rect.w, self.rect.h), "owner_id": self.owner_id}
 
 
 class Player:
@@ -54,12 +52,8 @@ class Player:
         self.is_being_stolen_from = False
         self.is_stunned = False
         self.stun_timer = 0
-
-        # --- NOVO: Controle de Imposto ---
         self.last_tax_amount = 0
         self.tax_visual_timer = 0
-        # ---------------------------------
-
         self.equipped_slots = [None, None, None]
         self.equipped_slot_positions_data = []
         self.has_weapon = {"Tênis": False, "Bateria Extra": False}
@@ -70,7 +64,6 @@ class Player:
         self.base_shield_duration_frames = 30 * FPS
         self.bonus_shield_duration_frames = 0
         self.shield_button_rect = pygame.Rect(self.base_rect.x + 5, self.base_rect.y + 5, 20, 20)
-
         slot_width, slot_height, slot_padding = 40, 50, 20
         start_x = self.base_rect.centerx - (3 * slot_width + 2 * slot_padding) // 2
         start_y = self.base_rect.centery - slot_height // 2
@@ -81,28 +74,17 @@ class Player:
     def to_dict(self):
         equipped = [b.to_dict() if b else None for b in self.equipped_slots]
         carrying = self.carrying_bottle.to_dict() if self.carrying_bottle else None
-        return {
-            "name": self.name,
-            "rect_data": (self.rect.x, self.rect.y, self.rect.w, self.rect.h),
-            "color": self.color,
-            "id": self.id,
-            "money": self.money,
-            "base_rect_data": (self.base_rect.x, self.base_rect.y, self.base_rect.w, self.base_rect.h),
-            "is_stunned": self.is_stunned,
-            "carrying_bottle_data": carrying,
-            "equipped_slots_data": equipped,
-            "equipped_slot_positions_data": self.equipped_slot_positions_data,
-            "has_weapon": self.has_weapon,
-            "consumables": self.consumables,
-            "shield_active": self.shield_active,
-            "shield_timer_frames": self.shield_timer,
-            "shield_cooldown_frames": self.shield_cooldown,
-            "shield_button_rect_data": (
-            self.shield_button_rect.x, self.shield_button_rect.y, self.shield_button_rect.w, self.shield_button_rect.h),
-            # --- NOVO: Envia dados do imposto ---
-            "last_tax_amount": self.last_tax_amount,
-            "tax_visual_timer": self.tax_visual_timer
-        }
+        return {"name": self.name, "rect_data": (self.rect.x, self.rect.y, self.rect.w, self.rect.h),
+                "color": self.color, "id": self.id, "money": self.money,
+                "base_rect_data": (self.base_rect.x, self.base_rect.y, self.base_rect.w, self.base_rect.h),
+                "is_stunned": self.is_stunned, "carrying_bottle_data": carrying, "equipped_slots_data": equipped,
+                "equipped_slot_positions_data": self.equipped_slot_positions_data, "has_weapon": self.has_weapon,
+                "consumables": self.consumables, "shield_active": self.shield_active,
+                "shield_timer_frames": self.shield_timer, "shield_cooldown_frames": self.shield_cooldown,
+                "shield_button_rect_data": (
+                self.shield_button_rect.x, self.shield_button_rect.y, self.shield_button_rect.w,
+                self.shield_button_rect.h), "last_tax_amount": self.last_tax_amount,
+                "tax_visual_timer": self.tax_visual_timer}
 
     def move(self, keys_pressed):
         if self.is_stunned or game_over: return
@@ -116,30 +98,20 @@ class Player:
         self.rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
 
     def update(self, all_players_list):
-        # Lógica do Escudo e Stun
         if self.shield_timer > 0:
             self.shield_timer -= 1
             if self.shield_timer <= 0: self.shield_active = False
         if self.shield_cooldown > 0: self.shield_cooldown -= 1
-
-        # Lógica Visual do Imposto
-        if self.tax_visual_timer > 0:
-            self.tax_visual_timer -= 1
-
+        if self.tax_visual_timer > 0: self.tax_visual_timer -= 1
         if self.is_stunned:
             self.stun_timer -= 1
             if self.stun_timer <= 0: self.is_stunned = False
             return
-
         self.is_being_stolen_from = any(
             p and p.carrying_bottle and p.carrying_bottle.owner_id == self.id for p in all_players_list)
-
         base_speed = self.base_speed + 2 if self.has_weapon["Tênis"] else self.base_speed
         self.current_speed = base_speed * self.theft_speed_multiplier if self.is_being_stolen_from else base_speed
-
-        if resenha_active:
-            self.current_speed *= 2
-
+        if resenha_active: self.current_speed *= 2
         if self.carrying_bottle: self.carrying_bottle.rect.center = self.rect.center
 
     def calculate_income(self):
@@ -150,8 +122,6 @@ class Player:
         global game_over
         if self.is_stunned or game_over: return
         others = [p for p in all_players_list if p and p != self]
-
-        # 1. Guardar Garrafa
         if self.carrying_bottle:
             if self.rect.colliderect(self.base_rect):
                 for i in range(3):
@@ -163,8 +133,6 @@ class Player:
                         self.carrying_bottle = None
                         return
             return
-
-        # 2. Recuperar Garrafa (Roubada)
         for other in others:
             if other.carrying_bottle and other.carrying_bottle.owner_id == self.id and self.rect.colliderect(
                     other.rect):
@@ -175,8 +143,6 @@ class Player:
                         self.equipped_slots[i].rect.center = (slot[0] + slot[2] // 2, slot[1] + slot[3] // 2)
                         other.carrying_bottle = None
                         return
-
-        # 3. Ativar Escudo
         if self.rect.colliderect(self.shield_button_rect):
             if self.shield_cooldown <= 0:
                 self.shield_active = True
@@ -184,31 +150,23 @@ class Player:
                 self.shield_timer = duration
                 self.shield_cooldown = (duration // FPS + 10) * FPS
             return
-
-        # 4. Vender Itens
         if self.rect.colliderect(self.base_rect):
             for i, slot_data in enumerate(self.equipped_slot_positions_data):
                 if self.equipped_slots[i] and self.rect.colliderect(pygame.Rect(slot_data)):
                     self.money += self.equipped_slots[i].value
                     self.equipped_slots[i] = None
                     return
-
-        # 5. Comprar Troféu
         trophy_rect = pygame.Rect(TROPHY_SHOP_RECT_DATA)
         if self.rect.colliderect(trophy_rect):
             if self.money >= TROPHY_SHOP_COST:
                 self.money -= TROPHY_SHOP_COST
-                print(f"JOGADOR {self.name} COMPROU O ITEM DE VITÓRIA!")
                 game_over = True
                 calculate_final_ranking(self)
             return
-
-        # 6. Comprar Upgrades
         for name, info in WEAPON_SHOP_ITEMS_DATA.items():
             if self.rect.colliderect(pygame.Rect(info["rect"])):
                 if self.money >= info["cost"]:
-                    if info["type"] == "passive" and self.has_weapon.get(name, False):
-                        return
+                    if info["type"] == "passive" and self.has_weapon.get(name, False): return
                     self.money -= info["cost"]
                     if info["type"] == "passive":
                         self.has_weapon[name] = True
@@ -216,8 +174,6 @@ class Player:
                     elif info["type"] == "consumable":
                         self.consumables[name] += 1
                     return
-
-        # 7. Comprar Packs
         for rarity, info in SHOP_PACKS_DATA.items():
             if self.rect.colliderect(pygame.Rect(info["rect"])):
                 if self.money >= info["cost"]:
@@ -231,19 +187,14 @@ class Player:
                             new_bottle.rect.center = (slot[0] + slot[2] // 2, slot[1] + slot[3] // 2)
                             return
                     return
-
-        # 8. Roubar
         for other in others:
-            if other.shield_active and self.rect.colliderect(other.base_rect):
-                return
+            if other.shield_active and self.rect.colliderect(other.base_rect): return
             if self.rect.colliderect(other.base_rect):
                 for i, slot_data in enumerate(other.equipped_slot_positions_data):
                     if other.equipped_slots[i] and self.rect.colliderect(pygame.Rect(slot_data)):
                         self.carrying_bottle = other.equipped_slots[i]
                         other.equipped_slots[i] = None
                         return
-
-        # 9. Comprar da esteira
         for bottle in conveyor_bottles:
             if self.rect.colliderect(bottle.rect):
                 if self.money >= bottle.value:
@@ -305,7 +256,6 @@ clients_lock = threading.Lock()
 
 
 def client_listener_thread(conn, player_id):
-    print(f"[Thread-{player_id}] Listener iniciada.")
     while True:
         try:
             header = conn.recv(HEADER_LENGTH)
@@ -314,17 +264,15 @@ def client_listener_thread(conn, player_id):
             data = b''
             while len(data) < length:
                 part = conn.recv(min(4096, length - len(data)))
-                if not part: raise ConnectionError("C2S Disconnect")
+                if not part: raise ConnectionError
                 data += part
             input_queue.put((player_id, pickle.loads(data)))
-        except Exception:
+        except:
             break
-    print(f"[Thread-{player_id}] Listener encerrada.")
     input_queue.put((player_id, "disconnect"))
 
 
 def client_sender_thread(conn, player_id):
-    print(f"[Thread-{player_id}] Sender iniciada.")
     q = output_queues[player_id]
     while True:
         try:
@@ -333,9 +281,8 @@ def client_sender_thread(conn, player_id):
             data = pickle.dumps(state)
             header = f"{len(data):<{HEADER_LENGTH}}".encode('utf-8')
             conn.sendall(header + data)
-        except Exception:
+        except:
             break
-    print(f"[Thread-{player_id}] Sender encerrada.")
     with clients_lock:
         client_connections.pop(player_id, None)
         output_queues.pop(player_id, None)
@@ -351,22 +298,16 @@ def calculate_final_ranking(winner_player):
 
 
 def game_logic_thread():
-    global players, conveyor_bottles, game_over, final_ranking, resenha_active
-
+    global players, conveyor_bottles, game_over, final_ranking, resenha_active, server_running
     spawn_timer = 0
     money_timer = 0
-    # --- NOVO: Timer do Imposto ---
     tax_timer = 0
-    # ------------------------------
     game_over_timer = -1
-    GAME_OVER_RESET_FRAMES = 15 * FPS
-
     resenha_cooldown = random.randint(RESENHA_MIN_INTERVAL_SEC, RESENHA_MAX_INTERVAL_SEC) * FPS
     resenha_duration = 0
 
-    print("[GameLogic] Thread de lógica iniciada.")
-
-    while True:
+    print("[ServerLogic] Loop iniciado.")
+    while server_running:
         loop_start_time = time.time()
 
         while not input_queue.empty():
@@ -384,19 +325,16 @@ def game_logic_thread():
                 if data['use_item']: player.use_orbital_ray(players)
 
         if not game_over:
-            # Resenha Logic
             if resenha_active:
                 resenha_duration -= 1
                 if resenha_duration <= 0:
                     resenha_active = False
                     resenha_cooldown = random.randint(RESENHA_MIN_INTERVAL_SEC, RESENHA_MAX_INTERVAL_SEC) * FPS
-                    print("[GameLogic] FIM DA RESENHA.")
             else:
                 resenha_cooldown -= 1
                 if resenha_cooldown <= 0:
                     resenha_active = True
                     resenha_duration = RESENHA_DURATION_SEC * FPS
-                    print("[GameLogic] RESENHA ATIVADA!!!")
 
             active = [p for p in players if p]
             for p in active: p.update(active)
@@ -413,7 +351,6 @@ def game_logic_thread():
             if money_timer == 0:
                 for p in active: p.money += p.calculate_income()
 
-            # --- NOVO: Lógica de Aplicação do Imposto ---
             tax_timer += 1
             if tax_timer >= TAX_INTERVAL:
                 tax_timer = 0
@@ -422,25 +359,20 @@ def game_logic_thread():
                         tax_amount = p.money * TAX_RATE
                         p.money -= tax_amount
                         p.last_tax_amount = tax_amount
-                        p.tax_visual_timer = FPS * 3  # Mostra msg por 3 segundos
-                        print(f"[Imposto] {p.name} pagou ${tax_amount:.2f}")
-            # --------------------------------------------
+                        p.tax_visual_timer = FPS * 3
 
-            if game_over:
-                game_over_timer = GAME_OVER_RESET_FRAMES
+            if game_over: game_over_timer = 15 * FPS
 
         else:
             if game_over_timer > 0:
                 game_over_timer -= 1
             elif game_over_timer == 0:
-                print("[GameLogic] Reiniciando partida...")
                 conveyor_bottles = []
                 game_over = False
                 final_ranking = []
                 game_over_timer = -1
                 resenha_active = False
-                resenha_cooldown = random.randint(RESENHA_MIN_INTERVAL_SEC, RESENHA_MAX_INTERVAL_SEC) * FPS
-                tax_timer = 0  # Reset timer
+                tax_timer = 0
                 for p in players:
                     if p:
                         p.money = 10.0
@@ -463,26 +395,32 @@ def game_logic_thread():
                 except:
                     pass
 
-        target_frame_time = 1.0 / FPS
         elapsed_time = time.time() - loop_start_time
-        sleep_time = target_frame_time - elapsed_time
-        if sleep_time > 0:
-            time.sleep(sleep_time)
+        if 1.0 / FPS - elapsed_time > 0: time.sleep(1.0 / FPS - elapsed_time)
 
 
-def main():
+def start_server_logic():
+    global server_running
+    server_running = True
+
+    ip = get_local_ip()
+    code = ip_to_code(ip)
+    print(f"--- SERVIDOR INICIADO ---")
+    print(f"IP Local: {ip}")
+    print(f"CÓDIGO DA SALA: {code}")
+    print(f"-------------------------")
+
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.bind(("0.0.0.0", PORT))
         s.listen(MAX_PLAYERS)
-        print(f"Servidor iniciado em 0.0.0.0:{PORT}...")
     except socket.error as e:
-        print(f"Erro bind: {e}");
-        sys.exit()
+        print(f"Erro bind: {e}")
+        return
 
     threading.Thread(target=game_logic_thread, daemon=True).start()
 
-    while True:
+    while server_running:
         try:
             conn, addr = s.accept()
             if game_over:
@@ -514,14 +452,13 @@ def main():
                     threading.Thread(target=client_listener_thread, args=(conn, new_player_id), daemon=True).start()
                     threading.Thread(target=client_sender_thread, args=(conn, new_player_id), daemon=True).start()
                     print(f"Jogador {new_player_id + 1} ({player_name}) conectado.")
-                except Exception as e:
-                    print(f"Erro init P{new_player_id}: {e}");
+                except:
                     conn.close()
             else:
                 conn.close()
-        except Exception as e:
-            print(f"Erro accept: {e}")
+        except:
+            pass
 
 
 if __name__ == "__main__":
-    main()
+    start_server_logic()
