@@ -39,53 +39,102 @@ INPUT_BOX_COLOR_INACTIVE = pygame.Color('lightskyblue3')
 INPUT_BOX_COLOR_ACTIVE = pygame.Color('dodgerblue2')
 
 # --- Raridades e Templates (MANTIDOS IGUAIS) ---
-RARITIES = ["Descartável", "Reutilizável", "Colecionável", "Premium", "Artefato"]
+RARITIES = ["Descartável", "Reutilizável", "Colecionável", "Premium", "Antiga", "Artefato", "Cósmica", "Bomba", "Misteriosa"]
+
 RARITY_COLORS = {
-    "Descartável": (150, 150, 150), "Reutilizável": (0, 200, 0), "Colecionável": (0, 100, 255),
-    "Premium": (150, 0, 200), "Artefato": (255, 150, 0)
+    "Descartável": (150, 150, 150), # Cinza
+    "Reutilizável": (0, 200, 0),    # Verde
+    "Colecionável": (0, 100, 255),  # Azul
+    "Premium": (150, 0, 200),       # Roxo
+    "Antiga": (139, 69, 19),        # Marrom/Bronze (NOVO)
+    "Artefato": (255, 140, 0),      # Laranja Escuro
+    "Cósmica": (0, 255, 255),       # Ciano Neon (NOVO)
+    "Bomba": (139, 0, 0),           # Vermelho Sangue
+    "Misteriosa": (255, 0, 255)     # Magenta
 }
-RARITY_WEIGHTS = [50, 30, 15, 4, 1]
 
+# Pesos para spawn na esteira (Normal)
+# Menos chance de lixo, chance pequena para as novas
+RARITY_WEIGHTS = [40, 25, 15, 8, 4, 2, 1, 3, 2]
+
+# Pesos para o Modo Resenha (Muito mais caos e itens caros)
+RESENHA_RARITY_WEIGHTS = [5, 10, 20, 25, 15, 10, 5, 5, 5]
+
+# --- Templates das Garrafas (LISTA EXPANDIDA) ---
 BOTTLE_TEMPLATES = [
-    {"name": "Água de Torneira", "rarity": "Descartável", "value": 5, "income": 0.1},
-    {"name": "Garrafinha Comum", "rarity": "Descartável", "value": 7, "income": 0.15},
-    {"name": "Marca Duvidosa", "rarity": "Descartável", "value": 6, "income": 0.12},
-    {"name": "Água Filtrada", "rarity": "Descartável", "value": 8, "income": 0.18},
-    {"name": "Água Mineral", "rarity": "Reutilizável", "value": 15, "income": 0.5},
-    {"name": "Garrafa Esportiva", "rarity": "Reutilizável", "value": 20, "income": 0.7},
-    {"name": "Squeeze Básico", "rarity": "Reutilizável", "value": 18, "income": 0.6},
-    {"name": "Garrafa de Plástico Duro", "rarity": "Reutilizável", "value": 22, "income": 0.8},
-    {"name": "Água de Nascente", "rarity": "Colecionável", "value": 50, "income": 1.5},
-    {"name": "Garrafa de Vidro", "rarity": "Colecionável", "value": 60, "income": 1.8},
-    {"name": "Edição Limitada", "rarity": "Colecionável", "value": 55, "income": 1.6},
-    {"name": "Água Vulcânica", "rarity": "Colecionável", "value": 65, "income": 2.0},
-    {"name": "Água de Geleira", "rarity": "Premium", "value": 150, "income": 5.0},
-    {"name": "Garrafa Térmica", "rarity": "Premium", "value": 180, "income": 6.0},
-    {"name": "Design Italiano", "rarity": "Premium", "value": 160, "income": 5.5},
-    {"name": "Água Alcalina", "rarity": "Premium", "value": 200, "income": 7.0},
-    {"name": "Fonte da Juventude", "rarity": "Artefato", "value": 500, "income": 20.0},
-    {"name": "Elixir Místico", "rarity": "Artefato", "value": 600, "income": 25.0},
-    {"name": "Água Lunar", "rarity": "Artefato", "value": 550, "income": 22.0},
-    {"name": "Hidromel dos Deuses", "rarity": "Artefato", "value": 700, "income": 30.0}
+    # --- Descartável (Valor: $2-$8 | Renda: $0.1-$0.3) ---
+    {"name": "Copo Plástico", "rarity": "Descartável", "value": 2.0, "income": 0.1},
+    {"name": "Lata Amassada", "rarity": "Descartável", "value": 3.0, "income": 0.1},
+    {"name": "Água da Torneira", "rarity": "Descartável", "value": 5.0, "income": 0.15},
+    {"name": "Garrafa Pet", "rarity": "Descartável", "value": 6.0, "income": 0.2},
+    {"name": "Saco de Leite", "rarity": "Descartável", "value": 4.0, "income": 0.1},
+    {"name": "Caixa de Suco", "rarity": "Descartável", "value": 7.0, "income": 0.25},
+    {"name": "Refrigerante Genérico", "rarity": "Descartável", "value": 8.0, "income": 0.3},
+
+    # --- Reutilizável (Valor: $15-$30 | Renda: $0.5-$1.0) ---
+    {"name": "Garrafa de Vidro", "rarity": "Reutilizável", "value": 15.0, "income": 0.5},
+    {"name": "Squeeze de Academia", "rarity": "Reutilizável", "value": 18.0, "income": 0.6},
+    {"name": "Cantil de Escoteiro", "rarity": "Reutilizável", "value": 22.0, "income": 0.7},
+    {"name": "Garrafa de Alumínio", "rarity": "Reutilizável", "value": 25.0, "income": 0.8},
+    {"name": "Growler de Cerveja", "rarity": "Reutilizável", "value": 28.0, "income": 0.9},
+    {"name": "Jarra de Suco", "rarity": "Reutilizável", "value": 20.0, "income": 0.6},
+    {"name": "Garrafa Térmica Velha", "rarity": "Reutilizável", "value": 30.0, "income": 1.0},
+
+    # --- Colecionável (Valor: $50-$100 | Renda: $1.5-$3.0) ---
+    {"name": "Vinho Importado", "rarity": "Colecionável", "value": 50.0, "income": 1.5},
+    {"name": "Licor Fino", "rarity": "Colecionável", "value": 60.0, "income": 1.8},
+    {"name": "Garrafa de Perfume", "rarity": "Colecionável", "value": 70.0, "income": 2.0},
+    {"name": "Vodka de Luxo", "rarity": "Colecionável", "value": 80.0, "income": 2.2},
+    {"name": "Azeite Trufado", "rarity": "Colecionável", "value": 90.0, "income": 2.5},
+    {"name": "Poção Decorativa", "rarity": "Colecionável", "value": 55.0, "income": 1.6},
+    {"name": "Garrafa de Coca 1950", "rarity": "Colecionável", "value": 100.0, "income": 3.0},
+
+    # --- Premium (Valor: $150-$300 | Renda: $5.0-$10.0) ---
+    {"name": "Champagne Francês", "rarity": "Premium", "value": 150.0, "income": 5.0},
+    {"name": "Whisky 18 Anos", "rarity": "Premium", "value": 180.0, "income": 6.0},
+    {"name": "Água dos Alpes", "rarity": "Premium", "value": 200.0, "income": 7.0},
+    {"name": "Decanter de Cristal", "rarity": "Premium", "value": 250.0, "income": 8.5},
+    {"name": "Garrafa de Ouro Líquido", "rarity": "Premium", "value": 300.0, "income": 10.0},
+    {"name": "Vinho do Porto Real", "rarity": "Premium", "value": 220.0, "income": 7.5},
+
+    # --- Antiga (NOVA) (Valor: $400-$800 | Renda: $15.0-$25.0) ---
+    {"name": "Ânfora Grega", "rarity": "Antiga", "value": 400.0, "income": 15.0},
+    {"name": "Vaso Ming", "rarity": "Antiga", "value": 500.0, "income": 18.0},
+    {"name": "Cantil da 1ª Guerra", "rarity": "Antiga", "value": 450.0, "income": 16.0},
+    {"name": "Frasco Egípcio", "rarity": "Antiga", "value": 600.0, "income": 20.0},
+    {"name": "Garrafa Viking", "rarity": "Antiga", "value": 700.0, "income": 22.0},
+    {"name": "Cabaça Indígena", "rarity": "Antiga", "value": 800.0, "income": 25.0},
+
+    # --- Artefato (Valor: $1000-$2000 | Renda: $40.0-$80.0) ---
+    {"name": "Fonte da Juventude", "rarity": "Artefato", "value": 1000.0, "income": 40.0},
+    {"name": "Cálice Sagrado", "rarity": "Artefato", "value": 1200.0, "income": 50.0},
+    {"name": "Lágrima de Fênix", "rarity": "Artefato", "value": 1500.0, "income": 60.0},
+    {"name": "Hidromel de Odin", "rarity": "Artefato", "value": 1800.0, "income": 70.0},
+    {"name": "Sangue de Dragão", "rarity": "Artefato", "value": 2000.0, "income": 80.0},
+
+    # --- Cósmica (NOVA) (Valor: $5000-$10000 | Renda: $200.0-$500.0) ---
+    {"name": "Matéria Escura", "rarity": "Cósmica", "value": 5000.0, "income": 200.0},
+    {"name": "Poeira Estelar", "rarity": "Cósmica", "value": 6000.0, "income": 250.0},
+    {"name": "Buraco Negro Portátil", "rarity": "Cósmica", "value": 8000.0, "income": 350.0},
+    {"name": "Via Láctea Engarrafada", "rarity": "Cósmica", "value": 10000.0, "income": 500.0},
+
+    # --- Especiais ---
+    {"name": "BOMBA!", "rarity": "Bomba", "value": 0, "income": 0},
+    {"name": "????", "rarity": "Misteriosa", "value": 0, "income": 0}
 ]
 
-# --- Posições e Lojas ---
-CONVEYOR_Y = SCREEN_HEIGHT // 2 - 30
-conveyor_rect_data = (0, CONVEYOR_Y, SCREEN_WIDTH, 60)
-base_width, base_height = 250, 100
-player_base_rects_data = [
-    (50, 50, base_width, base_height), (SCREEN_WIDTH - 300, 50, base_width, base_height),
-    (50, CONVEYOR_Y + 70, base_width, base_height), (SCREEN_WIDTH - 300, CONVEYOR_Y + 70, base_width, base_height)
-]
-player_start_pos = [(100, 250), (SCREEN_WIDTH - 130, 250), (100, 470), (SCREEN_WIDTH - 130, 470)]
-player_colors = [RED, BLUE, LIME_GREEN, MAGENTA]
-CONTROLS_TEXT = "Use: WASD (Mover) | F (Interagir) | G (Usar Item)"
+# --- Configurações de Posição e Lojas (Atualize o SHOP_PACKS_DATA também) ---
+# ... (Mantenha as posições de conveyor e players igual) ...
 
-PACK_WIDTH, PACK_HEIGHT, PACK_Y, PACK_PADDING = 180, 80, SCREEN_HEIGHT - 100, 20
+# Atualize a loja para incluir as novas raridades se quiser
+PACK_WIDTH, PACK_HEIGHT, PACK_Y, PACK_PADDING = 100, 60, SCREEN_HEIGHT - 120, 10 # Ajustei tamanho para caber mais
+
 SHOP_PACKS_DATA = {
-    "Descartável": {"cost": 10, "rect": (SCREEN_WIDTH // 2 - (PACK_WIDTH * 1.5 + PACK_PADDING), PACK_Y, PACK_WIDTH, PACK_HEIGHT)},
-    "Reutilizável": {"cost": 30, "rect": (SCREEN_WIDTH // 2 - (PACK_WIDTH * 0.5), PACK_Y, PACK_WIDTH, PACK_HEIGHT)},
-    "Colecionável": {"cost": 100, "rect": (SCREEN_WIDTH // 2 + (PACK_WIDTH * 0.5 + PACK_PADDING), PACK_Y, PACK_WIDTH, PACK_HEIGHT)}
+    "Comum": {"cost": 10, "rect": (SCREEN_WIDTH // 2 - 250, PACK_Y, PACK_WIDTH, PACK_HEIGHT)},
+    "Rara": {"cost": 50, "rect": (SCREEN_WIDTH // 2 - 140, PACK_Y, PACK_WIDTH, PACK_HEIGHT)},
+    "Épica": {"cost": 150, "rect": (SCREEN_WIDTH // 2 - 30, PACK_Y, PACK_WIDTH, PACK_HEIGHT)},
+    "Antiga": {"cost": 400, "rect": (SCREEN_WIDTH // 2 + 80, PACK_Y, PACK_WIDTH, PACK_HEIGHT)}, # NOVO
+    "Lendária": {"cost": 1000, "rect": (SCREEN_WIDTH // 2 + 190, PACK_Y, PACK_WIDTH, PACK_HEIGHT)}, # Preço subiu
 }
 
 WEAPON_WIDTH, WEAPON_HEIGHT, WEAPON_Y, WEAPON_PADDING = 180, 80, SCREEN_HEIGHT - 220, 10
