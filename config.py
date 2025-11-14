@@ -99,7 +99,7 @@ WEAPON_SHOP_ITEMS_DATA = {
     "Raio Orbital": {"cost": 500, "desc": "Atordoa(3s)+Devolve", "rect": (WEAPON_START_X + (WEAPON_WIDTH + WEAPON_PADDING) * 2, WEAPON_Y, WEAPON_WIDTH, WEAPON_HEIGHT), "type": "consumable"}
 }
 
-TROPHY_SHOP_COST = 25000
+TROPHY_SHOP_COST = 100000
 TROPHY_SHOP_RECT_DATA = ((SCREEN_WIDTH // 2) - 75, 65, 150, 70)
 
 # --- Eventos ---
