@@ -18,10 +18,65 @@ server_running = False
 
 active_event = None
 event_duration = 0
-la_ele_player_id = None  # ID de quem está com a "culpa"
+la_ele_player_id = None
+boss_entity = None
 
 
-# --- Classes (Bottle e Player) ---
+# --- Classes ---
+class Boss:
+    def __init__(self, x, y):
+        self.rect = pygame.Rect(x, y, 100, 100)
+        self.max_health = BOSS_MAX_HEALTH
+        self.current_health = self.max_health
+        self.is_active = True
+        self.move_speed = BOSS_MOVE_SPEED
+        self.stomp_cooldown = BOSS_STOMP_COOLDOWN
+
+    def to_dict(self):
+        return {
+            "rect_data": (self.rect.x, self.rect.y, self.rect.w, self.rect.h),
+            "max_health": self.max_health,
+            "current_health": self.current_health,
+            "is_active": self.is_active
+        }
+
+    def update(self, all_players):
+        if not self.is_active: return
+        active_players = [p for p in all_players if p]
+        if not active_players: return
+
+        # 1. Persegue o jogador mais próximo
+        closest_player = min(active_players,
+                             key=lambda p: (self.rect.centerx - p.rect.centerx) ** 2 + (
+                                         self.rect.centery - p.rect.centery) ** 2)
+
+        if self.rect.centerx < closest_player.rect.centerx: self.rect.x += self.move_speed
+        if self.rect.centerx > closest_player.rect.centerx: self.rect.x -= self.move_speed
+        if self.rect.centery < closest_player.rect.centery: self.rect.y += self.move_speed
+        if self.rect.centery > closest_player.rect.centery: self.rect.y -= self.move_speed
+
+        # 2. Ataque de Pisão
+        self.stomp_cooldown -= 1
+        if self.stomp_cooldown <= 0:
+            self.stomp_cooldown = BOSS_STOMP_COOLDOWN
+            for p in active_players:
+                dist_sq = (self.rect.centerx - p.rect.centerx) ** 2 + (self.rect.centery - p.rect.centery) ** 2
+                if dist_sq < 150 ** 2 and not p.shield_active:
+                    p.is_stunned = True
+                    p.stun_timer = 2 * FPS
+
+    def take_damage(self, amount):
+        if not self.is_active: return
+        self.current_health -= amount
+        if self.current_health <= 0:
+            self.is_active = False
+            self.current_health = 0
+            # Recompensa
+            for p in players:
+                if p: p.money += BOSS_REWARD_MONEY
+            print("[Evento] Boss Derrotado!")
+
+
 class Bottle:
     def __init__(self, template, is_golden=False):
         self.name = template["name"]
@@ -70,20 +125,15 @@ class Player:
         self.theft_speed_multiplier = 1.5
         self.carrying_bottle = None
         self.is_being_stolen_from = False
-
         self.is_stunned = False
         self.stun_timer = 0
         self.is_slowed = False
         self.slow_timer = 0
-
         self.last_tax_amount = 0
         self.tax_visual_timer = 0
-
-        # Status de Eventos
         self.controls_reversed = False
         self.la_ele_tag_cooldown = 0
         self.phone_rect = pygame.Rect(self.base_rect.x + 30, self.base_rect.y + 5, 20, 20)
-
         self.equipped_slots = [None, None, None]
         self.equipped_slot_positions_data = []
         self.has_weapon = {"Tênis": False, "Bateria Extra": False}
@@ -94,7 +144,6 @@ class Player:
         self.base_shield_duration_frames = 30 * FPS
         self.bonus_shield_duration_frames = 0
         self.shield_button_rect = pygame.Rect(self.base_rect.x + 5, self.base_rect.y + 5, 20, 20)
-
         slot_width, slot_height, slot_padding = 40, 50, 20
         start_x = self.base_rect.centerx - (3 * slot_width + 2 * slot_padding) // 2
         start_y = self.base_rect.centery - slot_height // 2
@@ -123,10 +172,7 @@ class Player:
 
     def move(self, keys_pressed):
         if self.is_stunned or game_over: return
-
         dx, dy = 0, 0
-
-        # Lógica WASSUUUP (Controles Invertidos)
         if self.controls_reversed:
             if keys_pressed[pygame.K_w]: dy = self.current_speed
             if keys_pressed[pygame.K_s]: dy = -self.current_speed
@@ -137,7 +183,6 @@ class Player:
             if keys_pressed[pygame.K_s]: dy = self.current_speed
             if keys_pressed[pygame.K_a]: dx = -self.current_speed
             if keys_pressed[pygame.K_d]: dx = self.current_speed
-
         self.rect.x += dx
         self.rect.y += dy
         self.rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -147,7 +192,6 @@ class Player:
         if self.shield_cooldown > 0: self.shield_cooldown -= 1
         if self.tax_visual_timer > 0: self.tax_visual_timer -= 1
         if self.la_ele_tag_cooldown > 0: self.la_ele_tag_cooldown -= 1
-
         if self.is_slowed:
             self.slow_timer -= 1
             if self.slow_timer <= 0: self.is_slowed = False
@@ -185,9 +229,12 @@ class Player:
         global game_over, la_ele_player_id
         if self.is_stunned or game_over: return
 
+        # Interagir com Boss não faz nada
+        if active_event == "BOSS FIGHT": return
+
         others = [p for p in all_players_list if p and p != self]
 
-        # --- 1. LÓGICA DE EVENTOS (Prioridade) ---
+        # 1. Lógica de Eventos (Prioridade)
         if active_event == "LA ELE" and la_ele_player_id == self.id:
             for other in others:
                 if self.rect.colliderect(other.rect) and not other.shield_active and other.la_ele_tag_cooldown <= 0:
@@ -201,7 +248,7 @@ class Player:
                 self.controls_reversed = False
                 return
 
-        # --- 2. LÓGICA BATATA QUENTE ---
+        # 2. Lógica Batata Quente
         if self.carrying_bottle and self.carrying_bottle.type == "bomb":
             for other in others:
                 if self.rect.colliderect(other.rect) and not other.is_stunned and not other.shield_active:
@@ -211,9 +258,9 @@ class Player:
                     if self.carrying_bottle and self.carrying_bottle.type == "bomb" and self.carrying_bottle.explode_timer == 0:
                         self.carrying_bottle.explode_timer = 10 * FPS
                     return
-            return  # Não pode guardar bomba
+            return
 
-        # --- 3. Guardar Garrafa (Normal ou Mistério) ---
+        # 3. Guardar Garrafa (Normal ou Mistério)
         if self.carrying_bottle:
             if self.rect.colliderect(self.base_rect):
                 if self.carrying_bottle.type == "mystery":
@@ -232,7 +279,7 @@ class Player:
                         return
             return
 
-            # --- 4. Interações (Mão Vazia) ---
+            # 4. Interações (Mão Vazia)
         for other in others:
             if other.carrying_bottle and other.carrying_bottle.owner_id == self.id and self.rect.colliderect(
                     other.rect):
@@ -336,7 +383,15 @@ class Player:
                     return
                 return
 
-    def use_orbital_ray(self, all_players_list):
+    def use_item_or_attack(self, all_players_list, boss):
+        # 1. Prioridade: Atacar o Boss
+        if active_event == "BOSS FIGHT" and boss and boss.is_active:
+            dist_sq = (self.rect.centerx - boss.rect.centerx) ** 2 + (self.rect.centery - boss.rect.centery) ** 2
+            if dist_sq < 100 ** 2:  # Raio de 100 pixels
+                boss.take_damage(1)
+            return
+
+        # 2. Se não tem boss, usa o Raio Orbital
         if self.is_stunned or self.consumables["Raio Orbital"] <= 0 or game_over: return
         self.consumables["Raio Orbital"] -= 1
         closest, min_dist = None, float('inf')
@@ -360,6 +415,7 @@ class Player:
                             return
 
 
+# --- Funções Auxiliares ---
 def create_bottle_by_rarity(rarity):
     possible_templates = [t for t in BOTTLE_TEMPLATES if t["rarity"] == rarity]
     if not possible_templates:
@@ -372,16 +428,12 @@ def create_bottle_by_rarity(rarity):
 def spawn_bottle():
     global resenha_active
     weights = RESENHA_RARITY_WEIGHTS if resenha_active else RARITY_WEIGHTS
-
     rarity_list = RARITIES
     if len(rarity_list) != len(weights):
-        print(f"ERRO: Config! {len(rarity_list)} raridades, {len(weights)} pesos.")
         weights = weights[:len(rarity_list)]
         if len(rarity_list) > len(weights):
             weights.extend([1] * (len(rarity_list) - len(weights)))
-
     rarity = random.choices(rarity_list, weights=weights, k=1)[0]
-
     bottle = create_bottle_by_rarity(rarity)
     rect = pygame.Rect(conveyor_rect_data)
     bottle.rect.topleft = (-bottle.rect.width, rect.y + (rect.height // 2 - bottle.rect.height // 2))
@@ -400,11 +452,9 @@ def apply_la_ele_punishment(player):
     if not player: return
     punishments = ["money", "bottle", "item", "stun", "slow"]
     chosen_punishment = random.choice(punishments)
-
     print(f"[LA ELE] {player.name} foi pego! Punição: {chosen_punishment}")
-
     if chosen_punishment == "money":
-        player.money *= 0.20
+        player.money *= 0.5
     elif chosen_punishment == "bottle":
         best_bottle_index = -1
         max_value = -1
@@ -479,7 +529,7 @@ def client_sender_thread(conn, player_id):
 # --- LOOP LÓGICO PRINCIPAL ---
 def game_logic_thread():
     global players, conveyor_bottles, game_over, final_ranking, resenha_active, server_running
-    global active_event, event_duration, la_ele_player_id
+    global active_event, event_duration, la_ele_player_id, boss_entity
 
     spawn_timer = 0
     money_timer = 0
@@ -489,8 +539,11 @@ def game_logic_thread():
     resenha_cooldown = random.randint(RESENHA_MIN_INTERVAL_SEC, RESENHA_MAX_INTERVAL_SEC) * FPS
     resenha_duration = 0
 
-    event_cooldown = EVENT_INTERVAL_FRAMES
+    event_cooldown = EVENT_INTERVAL_FRAMES  # Timer para WASSUP/LAELE
     event_duration = 0
+
+    boss_cooldown = random.randint(BOSS_EVENT_MIN_INTERVAL_SEC, BOSS_EVENT_MAX_INTERVAL_SEC) * FPS
+    boss_duration = 0
 
     print("[ServerLogic] Loop iniciado.")
     while server_running:
@@ -516,19 +569,35 @@ def game_logic_thread():
             if player:
                 player.move(data['keys'])
                 if data['interact']: player.handle_interaction(conveyor_bottles, players)
-                if data['use_item']: player.use_orbital_ray(players)
+                if data['use_item']: player.use_item_or_attack(players, boss_entity)
 
         if not game_over:
 
-            # --- LÓGICA DE EVENTOS (WASSUUUP & LA ELE) ---
-            if active_event:
+            # --- 1. CHECA SE EVENTO ESTÁ ATIVO ---
+            if resenha_active:
+                resenha_duration -= 1
+                if resenha_duration <= 0:
+                    resenha_active = False
+                    resenha_cooldown = random.randint(RESENHA_MIN_INTERVAL_SEC, RESENHA_MAX_INTERVAL_SEC) * FPS
+
+            elif active_event == "BOSS FIGHT":
+                boss_duration -= 1
+                if boss_entity:
+                    boss_entity.update(players)
+                    if not boss_entity.is_active:  # Boss foi derrotado
+                        boss_duration = 0
+                if boss_duration <= 0:
+                    active_event = None
+                    boss_entity = None
+                    boss_cooldown = random.randint(BOSS_EVENT_MIN_INTERVAL_SEC, BOSS_EVENT_MAX_INTERVAL_SEC) * FPS
+                    print("[Evento] BOSS FIGHT finalizada.")
+
+            elif active_event:  # WASSUP ou LA ELE
                 event_duration -= 1
                 if event_duration <= 0:
-                    # Finaliza evento
                     if active_event == "LA ELE" and la_ele_player_id is not None:
                         victim = players[la_ele_player_id]
                         apply_la_ele_punishment(victim)
-
                     active_event = None
                     la_ele_player_id = None
                     event_cooldown = EVENT_INTERVAL_FRAMES
@@ -536,44 +605,52 @@ def game_logic_thread():
                         if p: p.controls_reversed = False
                     print("[Evento] Evento finalizado.")
 
-            elif not resenha_active:
-                event_cooldown -= 1
-                if event_cooldown <= 0:
-                    active_players = [p for p in players if p]
-                    if active_players:
-                        active_event = random.choice(EVENT_TYPES)
-                        event_duration = EVENT_DURATION_FRAMES
-                        print(f"[Evento] {active_event} ativado!")
-
-                        if active_event == "WASSUUUP":
-                            for p in players:
-                                if p: p.controls_reversed = True
-                        elif active_event == "LA ELE":
-                            victim = random.choice(active_players)
-                            la_ele_player_id = victim.id
-
-            # Lógica da Resenha
-            if resenha_active:
-                resenha_duration -= 1
-                if resenha_duration <= 0:
-                    resenha_active = False
-                    resenha_cooldown = random.randint(RESENHA_MIN_INTERVAL_SEC, RESENHA_MAX_INTERVAL_SEC) * FPS
-            elif not active_event:
+            # --- 2. SE NENHUM EVENTO ATIVO, RODA OS TIMERS ---
+            else:
                 resenha_cooldown -= 1
+                event_cooldown -= 1
+                boss_cooldown -= 1
+
+                active_players = [p for p in players if p]
+
+                # Prioridade: Resenha > Boss > Evento Normal
                 if resenha_cooldown <= 0:
                     resenha_active = True
                     resenha_duration = RESENHA_DURATION_SEC * FPS
+                    print("[Evento] RESENHA ATIVADA!")
 
+                elif boss_cooldown <= 0 and active_players:
+                    active_event = "BOSS FIGHT"
+                    boss_duration = BOSS_MAX_DURATION_FRAMES
+                    boss_entity = Boss(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+                    print("[Evento] O ENGARRAFADOR APARECEU!")
+
+                elif event_cooldown <= 0 and active_players:
+                    active_event = random.choice(EVENT_TYPES)
+                    event_duration = EVENT_DURATION_FRAMES
+                    print(f"[Evento] {active_event} ativado!")
+
+                    if active_event == "WASSUUUP":
+                        for p in players:
+                            if p: p.controls_reversed = True
+                    elif active_event == "LA ELE":
+                        victim = random.choice(active_players)
+                        la_ele_player_id = victim.id
+                        victim.la_ele_tag_cooldown = 3 * FPS  # Evita passar de volta na hora
+
+            # --- 3. Lógica Normal do Jogo ---
             active = [p for p in players if p]
             for p in active: p.update(active)
 
-            spawn_timer = (spawn_timer + 1) % SPAWN_INTERVAL
-            if spawn_timer == 0 and len(conveyor_bottles) < 15: conveyor_bottles.append(spawn_bottle())
-
-            current_conveyor_speed = conveyor_speed * 2 if resenha_active else conveyor_speed
-            for b in conveyor_bottles[:]:
-                b.rect.x += current_conveyor_speed
-                if b.rect.left > SCREEN_WIDTH: conveyor_bottles.remove(b)
+            if active_event != "BOSS FIGHT":
+                spawn_timer = (spawn_timer + 1) % SPAWN_INTERVAL
+                if spawn_timer == 0 and len(conveyor_bottles) < 15:
+                    conveyor_bottles.append(spawn_bottle())
+                current_conveyor_speed = conveyor_speed * 2 if resenha_active else conveyor_speed
+                for b in conveyor_bottles[:]:
+                    b.rect.x += current_conveyor_speed
+                    if b.rect.left > SCREEN_WIDTH:
+                        conveyor_bottles.remove(b)
 
             money_timer = (money_timer + 1) % MONEY_INTERVAL
             if money_timer == 0:
@@ -602,6 +679,7 @@ def game_logic_thread():
                 resenha_active = False
                 active_event = None
                 la_ele_player_id = None
+                boss_entity = None
                 tax_timer = 0
                 for p in players:
                     if p:
@@ -611,6 +689,7 @@ def game_logic_thread():
                         p.last_tax_amount = 0
                         p.is_stunned = False
                         p.is_slowed = False
+                        p.controls_reversed = False
 
         state = {
             "players": [p.to_dict() if p else None for p in players],
@@ -619,8 +698,9 @@ def game_logic_thread():
             "final_ranking": [p.to_dict() for p in final_ranking if p],
             "resenha_active": resenha_active,
             "active_event": active_event,
-            "event_duration": event_duration,
-            "la_ele_player_id": la_ele_player_id
+            "event_duration": event_duration if active_event != "BOSS FIGHT" else boss_duration,
+            "la_ele_player_id": la_ele_player_id,
+            "boss_data": boss_entity.to_dict() if boss_entity else None
         }
 
         with clients_lock:
@@ -639,14 +719,9 @@ def game_logic_thread():
 def start_server_logic():
     global server_running
     server_running = True
-
     ip = get_local_ip()
     code = ip_to_code(ip)
-    print(f"--- SERVIDOR INICIADO ---")
-    print(f"IP Local: {ip}")
-    print(f"CÓDIGO DA SALA: {code}")
-    print(f"-------------------------")
-
+    print(f"--- SERVIDOR INICIADO ---\nIP Local: {ip}\nCÓDIGO DA SALA: {code}\n-------------------------")
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.bind(("0.0.0.0", PORT))
@@ -654,38 +729,31 @@ def start_server_logic():
     except socket.error as e:
         print(f"Erro bind: {e}")
         return
-
     threading.Thread(target=game_logic_thread, daemon=True).start()
-
     while server_running:
         try:
             conn, addr = s.accept()
             if game_over:
-                conn.close()
+                conn.close();
                 continue
-
             new_player_id = -1
             with clients_lock:
                 for i in range(MAX_PLAYERS):
                     if players[i] is None and i not in client_connections:
-                        new_player_id = i
+                        new_player_id = i;
                         break
-
             if new_player_id != -1:
                 try:
                     conn.send(pickle.dumps(new_player_id))
                     player_name_bytes = conn.recv(1024)
                     player_name = pickle.loads(player_name_bytes)
-
                     start_x, start_y = player_start_pos[new_player_id]
                     color = player_colors[new_player_id]
                     base_data = player_base_rects_data[new_player_id]
                     players[new_player_id] = Player(start_x, start_y, color, base_data, new_player_id, player_name)
-
                     with clients_lock:
                         output_queues[new_player_id] = Queue()
                         client_connections[new_player_id] = conn
-
                     threading.Thread(target=client_listener_thread, args=(conn, new_player_id), daemon=True).start()
                     threading.Thread(target=client_sender_thread, args=(conn, new_player_id), daemon=True).start()
                     print(f"Jogador {new_player_id + 1} ({player_name}) conectado.")

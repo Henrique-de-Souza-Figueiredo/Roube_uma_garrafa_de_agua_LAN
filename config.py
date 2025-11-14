@@ -79,7 +79,7 @@ player_base_rects_data = [
 ]
 player_start_pos = [(100, 250), (SCREEN_WIDTH - 130, 250), (100, 470), (SCREEN_WIDTH - 130, 470)]
 player_colors = [RED, BLUE, LIME_GREEN, MAGENTA]
-CONTROLS_TEXT = "Use: WASD (Mover) | F (Interagir) | G (Usar Item)"
+CONTROLS_TEXT = "Use: WASD (Mover) | F (Interagir) | G (Usar Item/Atacar)"
 
 PACK_WIDTH, PACK_HEIGHT, PACK_Y, PACK_PADDING = 100, 60, SCREEN_HEIGHT - 120, 10
 start_shop_x = (SCREEN_WIDTH - (5 * PACK_WIDTH + 4 * PACK_PADDING)) // 2
@@ -107,10 +107,21 @@ RESENHA_DURATION_SEC = 90
 RESENHA_MIN_INTERVAL_SEC = 240
 RESENHA_MAX_INTERVAL_SEC = 360
 
-# --- NOVO: Ambos Eventos ---
-EVENT_TYPES = ["WASSUUUP", "LA ELE"]
-EVENT_DURATION_FRAMES = 20 * FPS  # Duração de ambos (20s)
+# Eventos Normais
+EVENT_TYPES = ["WASSUUUP", "LA ELE"] # Lista de eventos comuns
+EVENT_DURATION_FRAMES = 20 * FPS
 EVENT_INTERVAL_FRAMES = 120 * FPS # Chance a cada 2 minutos
+
+# Evento Raro: Boss Fight
+BOSS_EVENT_MIN_INTERVAL_SEC = 300 # Chance a cada 5-10 minutos
+BOSS_EVENT_MAX_INTERVAL_SEC = 600
+BOSS_MAX_DURATION_FRAMES = 180 * FPS # 3 minutos para derrotar
+BOSS_IMAGE_PATH = "boss.png"
+BOSS_MUSIC_PATH = "boss_music.mp3"
+BOSS_MAX_HEALTH = 200
+BOSS_MOVE_SPEED = 2
+BOSS_STOMP_COOLDOWN = 3 * FPS
+BOSS_REWARD_MONEY = 5000
 
 # --- Rede ---
 def get_local_ip():
