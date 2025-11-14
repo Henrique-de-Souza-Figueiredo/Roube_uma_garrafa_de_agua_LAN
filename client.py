@@ -6,25 +6,24 @@ import threading
 from network import Network
 from config import *
 
-# Tenta importar o servidor para o modo Host
+# Tenta importar o servidor
 try:
     import server
 
     HAS_SERVER_FILE = True
 except ImportError:
     HAS_SERVER_FILE = False
-    print("Aviso: 'server.py' não encontrado. Modo 'Criar Partida' desativado.")
+    print("AVISO: server.py não encontrado. Modo 'Criar Partida' desabilitado.")
 
 # --- Inicialização ---
 pygame.init()
 pygame.font.init()
-pygame.key.set_repeat(500, 30)  # Permite segurar backspace
+pygame.key.set_repeat(500, 30)  # Facilita apagar texto
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Guerra das Garrafas - Cliente")
 clock = pygame.time.Clock()
 
-# Fontes
 font = pygame.font.SysFont(None, 48)
 small_font = pygame.font.SysFont(None, 24)
 price_font = pygame.font.SysFont(None, 18)
@@ -35,7 +34,7 @@ resenha_font = pygame.font.SysFont(None, 100, bold=True)
 game_mode_state = 0
 player_name_input = ""
 code_input = ""
-connection_status = ""  # Feedback para o usuário
+connection_status = ""  # Feedback para usuário
 is_host = False
 my_lan_code = ""
 
@@ -43,7 +42,7 @@ last_resenha_pos_change = 0
 current_resenha_pos = (0, 0)
 
 
-# --- Componentes de UI ---
+# --- Componentes de UI Simples ---
 class Button:
     def __init__(self, text, x, y, w, h, color, text_color=WHITE):
         self.rect = pygame.Rect(x, y, w, h)
@@ -72,7 +71,6 @@ def draw_bottle(surface, bottle_data):
     if not bottle_data: return
     rect = pygame.Rect(bottle_data["rect_data"])
     color = bottle_data["color"]
-
     pygame.draw.rect(surface, color, rect)
 
     if bottle_data["is_golden"]:
@@ -86,9 +84,10 @@ def draw_bottle(surface, bottle_data):
         if (pygame.time.get_ticks() // 200) % 2 == 0:
             pygame.draw.rect(surface, RED, rect, 3)
 
-        # Mostra o timer
-        timer_sec = bottle_data.get("explode_timer", 0) // FPS
-        if timer_sec > 0:
+        # Mostra o timer (apenas se estiver ativo, > 0)
+        timer_frames = bottle_data.get("explode_timer", 0)
+        if timer_frames > 0:
+            timer_sec = (timer_frames // FPS) + 1
             timer_surf = font.render(str(timer_sec), True, RED)
             surface.blit(timer_surf, timer_surf.get_rect(center=rect.center))
 
@@ -111,7 +110,7 @@ def draw_player(surface, player_data):
         b_rect.center = rect.center
         temp_b_data = b_data.copy()
         temp_b_data["rect_data"] = (b_rect.x, b_rect.y, b_rect.w, b_rect.h)
-        draw_bottle(surface, temp_b_data)  # Desenha garrafa (com lógica da bomba)
+        draw_bottle(surface, temp_b_data)  # Usa a nova função (mostra timer da bomba)
 
     if player_data["is_stunned"]:
         stun = small_font.render("STUNNED", True, YELLOW)
@@ -149,19 +148,26 @@ def draw_base(surface, player_data):
 
 
 def draw_tooltip(surface, bottle_data, mouse_pos):
-    # CORRIGIDO: Proteção contra KeyError se a raridade não estiver no dict
+    # Proteção para raridades que não estão no dict (Bomba, Misteriosa)
     color = RARITY_COLORS.get(bottle_data["rarity"], WHITE)
-    gold = " (Dourada)" if bottle_data.get("is_golden", False) else ""
+    gold = " (Dourada)" if bottle_data.get("is_golden") else ""
 
-    # CORRIGIDO: Usa fonte pequena
+    # Nome especial para garrafas de caos
+    name_display = bottle_data['name']
+    if bottle_data['rarity'] == "Bomba":
+        name_display = "BATATA QUENTE!"
+    elif bottle_data['rarity'] == "Misteriosa":
+        name_display = "GARRAFA MISTERIOSA"
+
     lines = [
-        (f"{bottle_data['name']}{gold}", color),
+        (f"{name_display}{gold}", color),
         (f"Raridade: {bottle_data['rarity']}", WHITE),
         (f"Valor: ${bottle_data['value']:.2f}", YELLOW),
         (f"Renda: ${bottle_data['income']:.2f}/s", GREEN)
     ]
-    surfs = [small_font.render(text, True, color) for text, color in lines]
 
+    # Usa a fonte pequena para o tooltip
+    surfs = [small_font.render(text, True, t_color) for text, t_color in lines]
     pad = 5
     w = max(s.get_width() for s in surfs) + pad * 2
     h = sum(s.get_height() for s in surfs) + pad * (len(lines) + 1)
@@ -183,15 +189,15 @@ def draw_shop(surface):
 
     for rarity, info in SHOP_PACKS_DATA.items():
         rect, cost = pygame.Rect(info["rect"]), info["cost"]
-        # Proteção (assim como no tooltip)
+        # Proteção caso a raridade não exista
         color = RARITY_COLORS.get(rarity, GRAY)
 
         pygame.draw.rect(surface, SHOP_BLUE, rect)
         pygame.draw.rect(surface, color, rect, 3)
 
+        # Ajustado para caber nos botões menores
         r_text = small_font.render(f"{rarity}", True, WHITE)
         c_text = small_font.render(f"${cost}", True, YELLOW)
-
         surface.blit(r_text, r_text.get_rect(center=(rect.centerx, rect.centery - 10)))
         surface.blit(c_text, c_text.get_rect(center=(rect.centerx, rect.centery + 10)))
 
@@ -224,7 +230,7 @@ def draw_weapon_shop(surface):
 
 
 def draw_ui(surface, players_data_list, my_id):
-    if my_id is None: return  # Guarda de segurança
+    if my_id is None: return
 
     if players_data_list[my_id]:
         p = players_data_list[my_id]
@@ -246,10 +252,7 @@ def draw_ui(surface, players_data_list, my_id):
         if not p: continue
         name = p['name'][:10]
         money_txt = font.render(f"{name}: ${p['money']:.0f}", True, WHITE)
-        # Proteção caso 'Raio Orbital' não esteja definido
-        rays = p['consumables'].get('Raio Orbital', 0)
-        rays_txt = small_font.render(f"Raios: {rays}", True, WHITE)
-
+        rays_txt = small_font.render(f"Raios: {p['consumables'].get('Raio Orbital', 0)}", True, WHITE)
         shield_txt = get_shield_txt(p)
         x, y = positions[i]
 
@@ -379,7 +382,7 @@ def main():
 
     running = True
 
-    # Botões do Menu
+    # Elementos do Menu
     btn_join_game = Button("ENTRAR (CODIGO)", SCREEN_WIDTH // 2 - 200, 400, 400, 60, BLUE)
     btn_create_game = Button("CRIAR PARTIDA", SCREEN_WIDTH // 2 - 200, 500, 400, 60, GREEN)
 
@@ -399,11 +402,9 @@ def main():
     while running:
         clock.tick(FPS)
 
-        # Pega eventos uma vez por frame
         events = pygame.event.get()
         for event in events:
-            if event.type == pygame.QUIT:
-                running = False
+            if event.type == pygame.QUIT: running = False
 
         # --- ESTADO 0: MENU PRINCIPAL ---
         if game_mode_state == 0:
@@ -439,7 +440,6 @@ def main():
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN and player_name_input.strip():
                         if is_host:
-                            # Inicia servidor e conecta
                             t = threading.Thread(target=server.start_server_logic, daemon=True)
                             t.start()
                             pygame.time.wait(1000)
@@ -452,8 +452,8 @@ def main():
                                 my_id = n.get_player_id()
                                 if my_id is None: raise Exception("ID Nulo")
                                 game_mode_state = 3
-                            except Exception as e:
-                                print(f"Erro ao conectar no host local: {e}")
+                            except:
+                                print("Erro ao conectar no host local")
                                 running = False
                         else:
                             game_mode_state = 2
@@ -473,7 +473,6 @@ def main():
             txt_surf = font.render(code_input, True, WHITE)
             screen.blit(txt_surf, (input_rect.x + 5, input_rect.y + 10))
 
-            # Mostra status de conexão/erro
             if connection_status:
                 draw_text_centered(screen, connection_status, 400, small_font, RED)
 
@@ -484,7 +483,7 @@ def main():
                         if target_ip:
                             try:
                                 connection_status = "Conectando..."
-                                pygame.display.flip()  # Mostra "Conectando"
+                                pygame.display.flip()
 
                                 n = Network(target_ip, player_name_input, PORT)
                                 my_id = n.get_player_id()
@@ -501,7 +500,7 @@ def main():
                             code_input = ""
                     elif event.key == pygame.K_BACKSPACE:
                         code_input = code_input[:-1]
-                    elif len(code_input) < 8 and event.unicode.isalnum():
+                    elif len(code_input) < 8 and event.unicode.isalnum():  # Código tem 8 chars
                         code_input += event.unicode.upper()
             pygame.display.flip()
 
@@ -545,7 +544,7 @@ def main():
                 redraw_window(screen, game_state, my_id)
             else:
                 screen.fill(DARK_GRAY)
-                draw_text_centered(screen, "Conectando...", SCREEN_HEIGHT // 2)
+                draw_text_centered(screen, "Sincronizando...", SCREEN_HEIGHT // 2)
                 pygame.display.flip()
 
     pygame.quit()

@@ -31,30 +31,27 @@ class Bottle:
         self.rect = pygame.Rect(0, 0, 20, 40)
         self.owner_id = None
 
-        # --- LÓGICA DO CAOS ADICIONADA ---
         self.type = "normal"
         if self.rarity == "Bomba":
             self.type = "bomb"
             self.explode_timer = 0  # Timer só começa quando pega
         elif self.rarity == "Misteriosa":
             self.type = "mystery"
-            # Decide o que ela é secretamente
             possible = [t for t in BOTTLE_TEMPLATES if t["rarity"] in ["Colecionável", "Premium", "Antiga", "Artefato"]]
             self.real_template = random.choice(possible) if possible else BOTTLE_TEMPLATES[0]
 
     def update(self):
-        """Atualiza o estado interno da garrafa (timer da bomba)."""
         if self.type == "bomb" and self.explode_timer > 0:
             self.explode_timer -= 1
 
     def to_dict(self):
-        return {"name": self.name, "rarity": self.rarity, "value": self.value, "income": self.income,
-                "is_golden": self.is_golden, "color": self.color,
-                "rect_data": (self.rect.x, self.rect.y, self.rect.w, self.rect.h),
-                "owner_id": self.owner_id,
-                "type": self.type,  # Envia o tipo para o cliente
-                "explode_timer": getattr(self, "explode_timer", 0)  # Envia o timer
-                }
+        return {
+            "name": self.name, "rarity": self.rarity, "value": self.value, "income": self.income,
+            "is_golden": self.is_golden, "color": self.color,
+            "rect_data": (self.rect.x, self.rect.y, self.rect.w, self.rect.h),
+            "owner_id": self.owner_id, "type": self.type,
+            "explode_timer": getattr(self, "explode_timer", 0)
+        }
 
 
 class Player:
@@ -129,19 +126,18 @@ class Player:
             if self.stun_timer <= 0: self.is_stunned = False
             return
 
-        # --- LÓGICA DA BOMBA (NOVO) ---
+        # Lógica da Bomba
         if self.carrying_bottle and self.carrying_bottle.type == "bomb":
             self.carrying_bottle.update()  # Tica o timer
             if self.carrying_bottle.explode_timer <= 0:
-                # Explodiu na mão!
+                # Explodiu!
                 self.is_stunned = True
                 self.stun_timer = 5 * FPS  # 5s de stun
                 self.carrying_bottle = None  # Perde a bomba
-                # Opcional: Perde um item aleatório dos slots
+                # Perde um item aleatório dos slots
                 slots_cheios = [i for i, slot in enumerate(self.equipped_slots) if slot]
                 if slots_cheios:
                     self.equipped_slots[random.choice(slots_cheios)] = None
-        # --- FIM DA LÓGICA DA BOMBA ---
 
         self.is_being_stolen_from = any(
             p and p.carrying_bottle and p.carrying_bottle.owner_id == self.id for p in all_players_list)
@@ -160,22 +156,44 @@ class Player:
 
         others = [p for p in all_players_list if p and p != self]
 
-        # 1. Guardar Garrafa
+        # --- 1. LÓGICA DA BATATA QUENTE (Prioridade Máxima) ---
+        if self.carrying_bottle and self.carrying_bottle.type == "bomb":
+            # 1a. Tentar passar
+            for other in others:
+                if self.rect.colliderect(other.rect) and not other.is_stunned and not other.shield_active:
+                    # TROCA FORÇADA
+                    other_bottle = other.carrying_bottle
+                    other.carrying_bottle = self.carrying_bottle
+                    self.carrying_bottle = other_bottle
+
+                    # Se a garrafa que recebi (other_bottle) for uma bomba,
+                    # seu timer DEVE estar rodando (caso tenha vindo de um slot).
+                    if self.carrying_bottle and self.carrying_bottle.type == "bomb":
+                        if self.carrying_bottle.explode_timer == 0:
+                            self.carrying_bottle.explode_timer = 10 * FPS
+
+                    print(f"{self.name} trocou a BOMBA com {other.name}!")
+                    return  # Ação de troca concluída
+
+            # 1b. Tentar guardar (NÃO PODE)
+            if self.rect.colliderect(self.base_rect):
+                return  # Não pode guardar bomba, não faz nada.
+
+            # 1c. Se não passou e não guardou, não faz mais nada
+            return
+
+            # --- 2. Guardar Garrafa (Se estou carregando item NORMAL ou MISTÉRIO) ---
         if self.carrying_bottle:
             if self.rect.colliderect(self.base_rect):
-
-                # --- LÓGICA DO CAOS (NOVO) ---
-                if self.carrying_bottle.type == "bomb":
-                    self.carrying_bottle = None  # Bomba é desarmada na base
-                    return
+                # (A lógica da bomba foi movida para cima)
                 if self.carrying_bottle.type == "mystery":
                     # Revela o item
                     template = self.carrying_bottle.real_template
                     is_gold = self.carrying_bottle.is_golden
                     self.carrying_bottle = Bottle(template, is_gold)  # Substitui pela real
                     self.carrying_bottle.owner_id = self.id
-                # --- FIM DA LÓGICA DO CAOS ---
 
+                # Tenta guardar em um slot
                 for i in range(3):
                     if self.equipped_slots[i] is None:
                         self.equipped_slots[i] = self.carrying_bottle
@@ -184,9 +202,11 @@ class Player:
                         self.equipped_slots[i].rect.center = (slot[0] + slot[2] // 2, slot[1] + slot[3] // 2)
                         self.carrying_bottle = None
                         return
-            return  # Se não guardou (sem slot ou fora da base), não faz mais nada
+            return  # Não conseguiu guardar (slots cheios ou fora da base)
 
-        # 2. Recuperar Garrafa
+        # --- 3. Interações (Se mão vazia) ---
+
+        # 3a. Recuperar Garrafa
         for other in others:
             if other.carrying_bottle and other.carrying_bottle.owner_id == self.id and self.rect.colliderect(
                     other.rect):
@@ -198,7 +218,7 @@ class Player:
                         other.carrying_bottle = None
                         return
 
-        # 3. Ativar Escudo
+        # 3b. Ativar Escudo
         if self.rect.colliderect(self.shield_button_rect):
             if self.shield_cooldown <= 0:
                 self.shield_active = True
@@ -207,7 +227,7 @@ class Player:
                 self.shield_cooldown = (duration // FPS + 10) * FPS
             return
 
-        # 4. Vender Itens
+        # 3c. Vender Itens
         if self.rect.colliderect(self.base_rect):
             for i, slot_data in enumerate(self.equipped_slot_positions_data):
                 if self.equipped_slots[i] and self.rect.colliderect(pygame.Rect(slot_data)):
@@ -215,7 +235,7 @@ class Player:
                     self.equipped_slots[i] = None
                     return
 
-        # 5. Comprar Troféu
+        # 3d. Comprar Troféu
         trophy_rect = pygame.Rect(TROPHY_SHOP_RECT_DATA)
         if self.rect.colliderect(trophy_rect):
             if self.money >= TROPHY_SHOP_COST:
@@ -224,7 +244,7 @@ class Player:
                 calculate_final_ranking(self)
             return
 
-        # 6. Comprar Upgrades
+        # 3e. Comprar Upgrades
         for name, info in WEAPON_SHOP_ITEMS_DATA.items():
             if self.rect.colliderect(pygame.Rect(info["rect"])):
                 if self.money >= info["cost"]:
@@ -237,9 +257,9 @@ class Player:
                         self.consumables[name] += 1
                     return
                 else:
-                    return  # Sem dinheiro, para
+                    return  # Sem dinheiro
 
-        # 7. Comprar Packs
+        # 3f. Comprar Packs
         for rarity, info in SHOP_PACKS_DATA.items():
             if self.rect.colliderect(pygame.Rect(info["rect"])):
                 if self.money >= info["cost"]:
@@ -252,11 +272,11 @@ class Player:
                             slot = self.equipped_slot_positions_data[i]
                             new_bottle.rect.center = (slot[0] + slot[2] // 2, slot[1] + slot[3] // 2)
                             return
-                    return  # Sem slots, para
+                    return  # Sem slots
                 else:
-                    return  # Sem dinheiro, para
+                    return  # Sem dinheiro
 
-        # 8. Roubar Base Inimiga
+        # 3g. Roubar Base Inimiga
         for other in others:
             if other.shield_active and self.rect.colliderect(other.base_rect): return
             if self.rect.colliderect(other.base_rect):
@@ -269,26 +289,23 @@ class Player:
                             self.carrying_bottle.explode_timer = 10 * FPS
                         return
 
-        # 9. Comprar da esteira
+        # 3h. Pegar da esteira
         for bottle in conveyor_bottles:
             if self.rect.colliderect(bottle.rect):
-                # --- LÓGICA DO CAOS (NOVO) ---
                 is_special = bottle.rarity in ["Bomba", "Misteriosa"]
+
                 if is_special and self.carrying_bottle is None:  # Só pega se a mão tiver livre
-                    if self.money >= bottle.value:  # (Valor é 0, mas checa)
+                    if self.money >= bottle.value:
                         self.money -= bottle.value
                         self.carrying_bottle = bottle
                         bottle.owner_id = self.id
-                        # Ativa o timer da bomba
                         if bottle.type == "bomb":
                             bottle.explode_timer = 10 * FPS
                         conveyor_bottles.remove(bottle)
                         return
                     else:
-                        return  # Sem dinheiro
-                # --- FIM DA LÓGICA DO CAOS ---
+                        return
 
-                # Lógica normal para garrafas normais
                 if self.money >= bottle.value and not is_special:
                     for i in range(3):
                         if self.equipped_slots[i] is None:
@@ -299,8 +316,8 @@ class Player:
                             bottle.rect.center = (slot[0] + slot[2] // 2, slot[1] + slot[3] // 2)
                             conveyor_bottles.remove(bottle)
                             return
-                    return  # Sem slots
-                return  # Sem dinheiro ou é especial e mão cheia
+                    return
+                return
 
     def use_orbital_ray(self, all_players_list):
         if self.is_stunned or self.consumables["Raio Orbital"] <= 0 or game_over: return
@@ -329,22 +346,19 @@ class Player:
 def create_bottle_by_rarity(rarity):
     possible_templates = [t for t in BOTTLE_TEMPLATES if t["rarity"] == rarity]
     if not possible_templates:
-        # Fallback de segurança
-        template = BOTTLE_TEMPLATES[0]
+        template = BOTTLE_TEMPLATES[0]  # Fallback
     else:
         template = random.choice(possible_templates)
-    return Bottle(template, random.random() < 0.1)  # 10% chance de ser Dourada
+    return Bottle(template, random.random() < 0.1)
 
 
 def spawn_bottle():
     global resenha_active
     weights = RESENHA_RARITY_WEIGHTS if resenha_active else RARITY_WEIGHTS
 
-    # Garante que as listas tenham o mesmo tamanho
     rarity_list = RARITIES
     if len(rarity_list) != len(weights):
         print(f"ERRO: Incompatibilidade de Config! {len(rarity_list)} raridades, {len(weights)} pesos.")
-        # Ajusta pesos para evitar crash
         weights = weights[:len(rarity_list)]
         if len(rarity_list) > len(weights):
             weights.extend([1] * (len(rarity_list) - len(weights)))
@@ -394,7 +408,7 @@ def client_sender_thread(conn, player_id):
             except:
                 break
     except KeyError:
-        pass  # Fila já foi limpa
+        pass
 
     with clients_lock:
         client_connections.pop(player_id, None)
