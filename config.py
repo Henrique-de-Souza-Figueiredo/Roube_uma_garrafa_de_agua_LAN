@@ -38,7 +38,7 @@ GREEN = (0, 200, 0)
 INPUT_BOX_COLOR_INACTIVE = pygame.Color('lightskyblue3')
 INPUT_BOX_COLOR_ACTIVE = pygame.Color('dodgerblue2')
 
-# --- Raridades e Templates (MANTIDOS IGUAIS) ---
+# --- Raridades e Templates ---
 RARITIES = ["Descartável", "Reutilizável", "Colecionável", "Premium", "Antiga", "Artefato", "Cósmica", "Bomba", "Misteriosa"]
 
 RARITY_COLORS = {
@@ -46,18 +46,17 @@ RARITY_COLORS = {
     "Reutilizável": (0, 200, 0),    # Verde
     "Colecionável": (0, 100, 255),  # Azul
     "Premium": (150, 0, 200),       # Roxo
-    "Antiga": (139, 69, 19),        # Marrom/Bronze (NOVO)
+    "Antiga": (139, 69, 19),        # Marrom/Bronze
     "Artefato": (255, 140, 0),      # Laranja Escuro
-    "Cósmica": (0, 255, 255),       # Ciano Neon (NOVO)
+    "Cósmica": (0, 255, 255),       # Ciano Neon
     "Bomba": (139, 0, 0),           # Vermelho Sangue
     "Misteriosa": (255, 0, 255)     # Magenta
 }
 
-# Pesos para spawn na esteira (Normal)
-# Menos chance de lixo, chance pequena para as novas
+# Pesos para spawn na esteira (Normal) - 9 itens
 RARITY_WEIGHTS = [40, 25, 15, 8, 4, 2, 1, 3, 2]
 
-# Pesos para o Modo Resenha (Muito mais caos e itens caros)
+# Pesos para o Modo Resenha (Muito mais caos e itens caros) - 9 itens
 RESENHA_RARITY_WEIGHTS = [5, 10, 20, 25, 15, 10, 5, 5, 5]
 
 # --- Templates das Garrafas (LISTA EXPANDIDA) ---
@@ -97,7 +96,7 @@ BOTTLE_TEMPLATES = [
     {"name": "Garrafa de Ouro Líquido", "rarity": "Premium", "value": 300.0, "income": 10.0},
     {"name": "Vinho do Porto Real", "rarity": "Premium", "value": 220.0, "income": 7.5},
 
-    # --- Antiga (NOVA) (Valor: $400-$800 | Renda: $15.0-$25.0) ---
+    # --- Antiga (Valor: $400-$800 | Renda: $15.0-$25.0) ---
     {"name": "Ânfora Grega", "rarity": "Antiga", "value": 400.0, "income": 15.0},
     {"name": "Vaso Ming", "rarity": "Antiga", "value": 500.0, "income": 18.0},
     {"name": "Cantil da 1ª Guerra", "rarity": "Antiga", "value": 450.0, "income": 16.0},
@@ -112,7 +111,7 @@ BOTTLE_TEMPLATES = [
     {"name": "Hidromel de Odin", "rarity": "Artefato", "value": 1800.0, "income": 70.0},
     {"name": "Sangue de Dragão", "rarity": "Artefato", "value": 2000.0, "income": 80.0},
 
-    # --- Cósmica (NOVA) (Valor: $5000-$10000 | Renda: $200.0-$500.0) ---
+    # --- Cósmica (Valor: $5000-$10000 | Renda: $200.0-$500.0) ---
     {"name": "Matéria Escura", "rarity": "Cósmica", "value": 5000.0, "income": 200.0},
     {"name": "Poeira Estelar", "rarity": "Cósmica", "value": 6000.0, "income": 250.0},
     {"name": "Buraco Negro Portátil", "rarity": "Cósmica", "value": 8000.0, "income": 350.0},
@@ -123,18 +122,32 @@ BOTTLE_TEMPLATES = [
     {"name": "????", "rarity": "Misteriosa", "value": 0, "income": 0}
 ]
 
-# --- Configurações de Posição e Lojas (Atualize o SHOP_PACKS_DATA também) ---
-# ... (Mantenha as posições de conveyor e players igual) ...
+# --- Posições (VARIÁVEIS QUE FALTAVAM) ---
+CONVEYOR_Y = SCREEN_HEIGHT // 2 - 30
+conveyor_rect_data = (0, CONVEYOR_Y, SCREEN_WIDTH, 60)
+base_width, base_height = 250, 100
 
-# Atualize a loja para incluir as novas raridades se quiser
-PACK_WIDTH, PACK_HEIGHT, PACK_Y, PACK_PADDING = 100, 60, SCREEN_HEIGHT - 120, 10 # Ajustei tamanho para caber mais
+player_base_rects_data = [
+    (50, 50, base_width, base_height),
+    (SCREEN_WIDTH - 300, 50, base_width, base_height),
+    (50, CONVEYOR_Y + 70, base_width, base_height),
+    (SCREEN_WIDTH - 300, CONVEYOR_Y + 70, base_width, base_height)
+]
+player_start_pos = [(100, 250), (SCREEN_WIDTH - 130, 250), (100, 470), (SCREEN_WIDTH - 130, 470)]
+player_colors = [RED, BLUE, LIME_GREEN, MAGENTA]
+CONTROLS_TEXT = "Use: WASD (Mover) | F (Interagir) | G (Usar Item)"
 
+# --- Lojas (CORRIGIDO) ---
+PACK_WIDTH, PACK_HEIGHT, PACK_Y, PACK_PADDING = 100, 60, SCREEN_HEIGHT - 120, 10
+start_shop_x = (SCREEN_WIDTH - (5 * PACK_WIDTH + 4 * PACK_PADDING)) // 2
+
+# CORRIGIDO: Chaves ("Descartável") batem com a lista RARITIES agora
 SHOP_PACKS_DATA = {
-    "Comum": {"cost": 10, "rect": (SCREEN_WIDTH // 2 - 250, PACK_Y, PACK_WIDTH, PACK_HEIGHT)},
-    "Rara": {"cost": 50, "rect": (SCREEN_WIDTH // 2 - 140, PACK_Y, PACK_WIDTH, PACK_HEIGHT)},
-    "Épica": {"cost": 150, "rect": (SCREEN_WIDTH // 2 - 30, PACK_Y, PACK_WIDTH, PACK_HEIGHT)},
-    "Antiga": {"cost": 400, "rect": (SCREEN_WIDTH // 2 + 80, PACK_Y, PACK_WIDTH, PACK_HEIGHT)}, # NOVO
-    "Lendária": {"cost": 1000, "rect": (SCREEN_WIDTH // 2 + 190, PACK_Y, PACK_WIDTH, PACK_HEIGHT)}, # Preço subiu
+    "Descartável":  {"cost": 10, "rect": (start_shop_x + (PACK_WIDTH + PACK_PADDING) * 0, PACK_Y, PACK_WIDTH, PACK_HEIGHT)},
+    "Reutilizável": {"cost": 50, "rect": (start_shop_x + (PACK_WIDTH + PACK_PADDING) * 1, PACK_Y, PACK_WIDTH, PACK_HEIGHT)},
+    "Colecionável": {"cost": 150, "rect": (start_shop_x + (PACK_WIDTH + PACK_PADDING) * 2, PACK_Y, PACK_WIDTH, PACK_HEIGHT)},
+    "Premium":      {"cost": 400, "rect": (start_shop_x + (PACK_WIDTH + PACK_PADDING) * 3, PACK_Y, PACK_WIDTH, PACK_HEIGHT)},
+    "Antiga":       {"cost": 1000, "rect": (start_shop_x + (PACK_WIDTH + PACK_PADDING) * 4, PACK_Y, PACK_WIDTH, PACK_HEIGHT)}
 }
 
 WEAPON_WIDTH, WEAPON_HEIGHT, WEAPON_Y, WEAPON_PADDING = 180, 80, SCREEN_HEIGHT - 220, 10
@@ -148,15 +161,16 @@ WEAPON_SHOP_ITEMS_DATA = {
 TROPHY_SHOP_COST = 25000
 TROPHY_SHOP_RECT_DATA = ((SCREEN_WIDTH // 2) - 75, 65, 150, 70)
 
+# --- Resenha (CORRIGIDO) ---
 RESENHA_DURATION_SEC = 90
 RESENHA_MIN_INTERVAL_SEC = 240
 RESENHA_MAX_INTERVAL_SEC = 360
-RESENHA_RARITY_WEIGHTS = [10, 10, 25, 35, 20]
+# CORRIGIDO: Removida a definição duplicada e errada.
+# Esta lista é usada: RESENHA_RARITY_WEIGHTS = [5, 10, 20, 25, 15, 10, 5, 5, 5]
 
-# --- NOVO: Sistema de Códigos ---
+# --- Sistema de Códigos ---
 def get_local_ip():
     try:
-        # Conecta num DNS público apenas para descobrir o IP da interface correta (não envia dados)
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
@@ -166,7 +180,6 @@ def get_local_ip():
         return "127.0.0.1"
 
 def ip_to_code(ip):
-    # Converte IP (ex: 192.168.0.1) para Hex (ex: C0A80001)
     try:
         packed = socket.inet_aton(ip)
         return packed.hex().upper()
@@ -174,10 +187,8 @@ def ip_to_code(ip):
         return "ERRO"
 
 def code_to_ip(code):
-    # Converte Hex para IP
     try:
         packed = bytes.fromhex(code)
         return socket.inet_ntoa(packed)
     except:
         return None
-
