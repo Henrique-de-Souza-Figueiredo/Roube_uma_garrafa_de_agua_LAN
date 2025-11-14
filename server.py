@@ -45,7 +45,6 @@ class Boss:
         active_players = [p for p in all_players if p]
         if not active_players: return
 
-        # 1. Persegue o jogador mais próximo
         closest_player = min(active_players,
                              key=lambda p: (self.rect.centerx - p.rect.centerx) ** 2 + (
                                          self.rect.centery - p.rect.centery) ** 2)
@@ -55,13 +54,14 @@ class Boss:
         if self.rect.centery < closest_player.rect.centery: self.rect.y += self.move_speed
         if self.rect.centery > closest_player.rect.centery: self.rect.y -= self.move_speed
 
-        # 2. Ataque de Pisão
         self.stomp_cooldown -= 1
         if self.stomp_cooldown <= 0:
             self.stomp_cooldown = BOSS_STOMP_COOLDOWN
             for p in active_players:
                 dist_sq = (self.rect.centerx - p.rect.centerx) ** 2 + (self.rect.centery - p.rect.centery) ** 2
-                if dist_sq < 150 ** 2 and not p.shield_active:
+                # --- CORREÇÃO AQUI ---
+                # O escudo (p.shield_active) não protege do pisão
+                if dist_sq < 150 ** 2:
                     p.is_stunned = True
                     p.stun_timer = 2 * FPS
 
@@ -71,7 +71,6 @@ class Boss:
         if self.current_health <= 0:
             self.is_active = False
             self.current_health = 0
-            # Recompensa
             for p in players:
                 if p: p.money += BOSS_REWARD_MONEY
             print("[Evento] Boss Derrotado!")
@@ -188,10 +187,17 @@ class Player:
         self.rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
 
     def update(self, all_players_list):
-        if self.shield_timer > 0: self.shield_timer -= 1
+        # --- CORREÇÃO DO BUG DO ESCUDO ---
+        if self.shield_timer > 0:
+            self.shield_timer -= 1
+            if self.shield_timer <= 0:
+                self.shield_active = False  # DESLIGA O ESCUDO
+        # --- FIM DA CORREÇÃO ---
+
         if self.shield_cooldown > 0: self.shield_cooldown -= 1
         if self.tax_visual_timer > 0: self.tax_visual_timer -= 1
         if self.la_ele_tag_cooldown > 0: self.la_ele_tag_cooldown -= 1
+
         if self.is_slowed:
             self.slow_timer -= 1
             if self.slow_timer <= 0: self.is_slowed = False
@@ -229,7 +235,6 @@ class Player:
         global game_over, la_ele_player_id
         if self.is_stunned or game_over: return
 
-        # Interagir com Boss não faz nada
         if active_event == "BOSS FIGHT": return
 
         others = [p for p in all_players_list if p and p != self]
@@ -237,7 +242,9 @@ class Player:
         # 1. Lógica de Eventos (Prioridade)
         if active_event == "LA ELE" and la_ele_player_id == self.id:
             for other in others:
-                if self.rect.colliderect(other.rect) and not other.shield_active and other.la_ele_tag_cooldown <= 0:
+                # --- CORREÇÃO AQUI ---
+                # Remove checagem de "shield_active"
+                if self.rect.colliderect(other.rect) and other.la_ele_tag_cooldown <= 0:
                     la_ele_player_id = other.id
                     self.la_ele_tag_cooldown = 3 * FPS
                     other.la_ele_tag_cooldown = 3 * FPS
@@ -251,7 +258,9 @@ class Player:
         # 2. Lógica Batata Quente
         if self.carrying_bottle and self.carrying_bottle.type == "bomb":
             for other in others:
-                if self.rect.colliderect(other.rect) and not other.is_stunned and not other.shield_active:
+                # --- CORREÇÃO AQUI ---
+                # Remove checagem de "shield_active"
+                if self.rect.colliderect(other.rect) and not other.is_stunned:
                     other_bottle = other.carrying_bottle
                     other.carrying_bottle = self.carrying_bottle
                     self.carrying_bottle = other_bottle
@@ -345,7 +354,12 @@ class Player:
                     return
 
         for other in others:
-            if other.shield_active and self.rect.colliderect(other.base_rect): return
+            # --- CORREÇÃO AQUI ---
+            # Esta é a única checagem que deve permanecer,
+            # pois protege a BASE de ser roubada.
+            if other.shield_active and self.rect.colliderect(other.base_rect):
+                return
+
             if self.rect.colliderect(other.base_rect):
                 for i, slot_data in enumerate(other.equipped_slot_positions_data):
                     if other.equipped_slots[i] and self.rect.colliderect(pygame.Rect(slot_data)):
@@ -387,7 +401,7 @@ class Player:
         # 1. Prioridade: Atacar o Boss
         if active_event == "BOSS FIGHT" and boss and boss.is_active:
             dist_sq = (self.rect.centerx - boss.rect.centerx) ** 2 + (self.rect.centery - boss.rect.centery) ** 2
-            if dist_sq < 100 ** 2:  # Raio de 100 pixels
+            if dist_sq < 100 ** 2:
                 boss.take_damage(1)
             return
 
@@ -415,7 +429,6 @@ class Player:
                             return
 
 
-# --- Funções Auxiliares ---
 def create_bottle_by_rarity(rarity):
     possible_templates = [t for t in BOTTLE_TEMPLATES if t["rarity"] == rarity]
     if not possible_templates:
@@ -539,7 +552,7 @@ def game_logic_thread():
     resenha_cooldown = random.randint(RESENHA_MIN_INTERVAL_SEC, RESENHA_MAX_INTERVAL_SEC) * FPS
     resenha_duration = 0
 
-    event_cooldown = EVENT_INTERVAL_FRAMES  # Timer para WASSUP/LAELE
+    event_cooldown = EVENT_INTERVAL_FRAMES
     event_duration = 0
 
     boss_cooldown = random.randint(BOSS_EVENT_MIN_INTERVAL_SEC, BOSS_EVENT_MAX_INTERVAL_SEC) * FPS
@@ -573,7 +586,6 @@ def game_logic_thread():
 
         if not game_over:
 
-            # --- 1. CHECA SE EVENTO ESTÁ ATIVO ---
             if resenha_active:
                 resenha_duration -= 1
                 if resenha_duration <= 0:
@@ -584,7 +596,7 @@ def game_logic_thread():
                 boss_duration -= 1
                 if boss_entity:
                     boss_entity.update(players)
-                    if not boss_entity.is_active:  # Boss foi derrotado
+                    if not boss_entity.is_active:
                         boss_duration = 0
                 if boss_duration <= 0:
                     active_event = None
@@ -605,7 +617,6 @@ def game_logic_thread():
                         if p: p.controls_reversed = False
                     print("[Evento] Evento finalizado.")
 
-            # --- 2. SE NENHUM EVENTO ATIVO, RODA OS TIMERS ---
             else:
                 resenha_cooldown -= 1
                 event_cooldown -= 1
@@ -613,7 +624,6 @@ def game_logic_thread():
 
                 active_players = [p for p in players if p]
 
-                # Prioridade: Resenha > Boss > Evento Normal
                 if resenha_cooldown <= 0:
                     resenha_active = True
                     resenha_duration = RESENHA_DURATION_SEC * FPS
@@ -636,9 +646,8 @@ def game_logic_thread():
                     elif active_event == "LA ELE":
                         victim = random.choice(active_players)
                         la_ele_player_id = victim.id
-                        victim.la_ele_tag_cooldown = 3 * FPS  # Evita passar de volta na hora
+                        victim.la_ele_tag_cooldown = 3 * FPS
 
-            # --- 3. Lógica Normal do Jogo ---
             active = [p for p in players if p]
             for p in active: p.update(active)
 

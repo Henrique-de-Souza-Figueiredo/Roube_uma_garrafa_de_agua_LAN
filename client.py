@@ -118,7 +118,7 @@ def draw_player(surface, player_data, game_state):
         surface.blit(stun, stun.get_rect(center=(rect.centerx, rect.top - 10)))
     if player_data.get("tax_visual_timer", 0) > 0:
         tax_amount = player_data.get("last_tax_amount", 0)
-        msg = small_font.render(f"-${tax_amount:.0f} IMPOSTO!", True, RED)
+        msg = small_font.render(f"-${tax_amount:.2f} IMPOSTO!", True, RED)
         offset_y = (FPS * 3 - player_data["tax_visual_timer"]) * 0.5
         surface.blit(msg, msg.get_rect(center=(rect.centerx, rect.top - 25 - offset_y)))
     if game_state.get("active_event") == "LA ELE" and game_state.get("la_ele_player_id") == player_data["id"]:
@@ -250,7 +250,7 @@ def draw_ui(surface, players_data_list, my_id):
     for i, p in enumerate(players_data_list):
         if not p: continue
         name = p['name'][:10]
-        money_txt = font.render(f"{name}: ${p['money']:.0f}", True, WHITE)
+        money_txt = font.render(f"{name}: ${p['money']:.2f}", True, WHITE)
         rays_txt = small_font.render(f"Raios: {p['consumables'].get('Raio Orbital', 0)}", True, WHITE)
         shield_txt = get_shield_txt(p)
         x, y = positions[i]
@@ -370,7 +370,7 @@ def redraw_window(surface, game_state, my_id):
         for b_data in bottles:
             draw_bottle(surface, b_data)
             b_rect = pygame.Rect(b_data["rect_data"])
-            price = price_font.render(f"${b_data['value']:.0f}", True, YELLOW)
+            price = price_font.render(f"${b_data['value']:.2f}", True, YELLOW)
             price_rect = price.get_rect(centerx=b_rect.centerx, bottom=b_rect.top - 2)
             surface.blit(price, price_rect)
 
