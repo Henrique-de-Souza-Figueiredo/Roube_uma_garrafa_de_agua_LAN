@@ -40,6 +40,7 @@ INPUT_BOX_COLOR_ACTIVE = pygame.Color('dodgerblue2')
 
 # --- Raridades e Templates ---
 RARITIES = ["Descartável", "Reutilizável", "Colecionável", "Premium", "Antiga", "Artefato", "Cósmica", "Bomba", "Misteriosa"]
+
 RARITY_COLORS = {
     "Descartável": (150, 150, 150), "Reutilizável": (0, 200, 0), "Colecionável": (0, 100, 255),
     "Premium": (150, 0, 200), "Antiga": (139, 69, 19), "Artefato": (255, 140, 0),
@@ -49,9 +50,9 @@ RARITY_WEIGHTS = [40, 25, 15, 8, 4, 2, 1, 3, 2]
 RESENHA_RARITY_WEIGHTS = [5, 10, 20, 25, 15, 10, 5, 5, 5]
 
 BOTTLE_TEMPLATES = [
+    # (Cole sua lista longa de garrafas aqui)
     {"name": "Copo Plástico", "rarity": "Descartável", "value": 2.0, "income": 0.1},
     {"name": "Água da Torneira", "rarity": "Descartável", "value": 5.0, "income": 0.15},
-    {"name": "Garrafa Pet", "rarity": "Descartável", "value": 6.0, "income": 0.2},
     {"name": "Garrafa de Vidro", "rarity": "Reutilizável", "value": 15.0, "income": 0.5},
     {"name": "Squeeze de Academia", "rarity": "Reutilizável", "value": 18.0, "income": 0.6},
     {"name": "Vinho Importado", "rarity": "Colecionável", "value": 50.0, "income": 1.5},
@@ -68,7 +69,7 @@ BOTTLE_TEMPLATES = [
     {"name": "????", "rarity": "Misteriosa", "value": 0, "income": 0}
 ]
 
-# --- Posições ---
+# --- Posições e Lojas ---
 CONVEYOR_Y = SCREEN_HEIGHT // 2 - 30
 conveyor_rect_data = (0, CONVEYOR_Y, SCREEN_WIDTH, 60)
 base_width, base_height = 250, 100
@@ -80,7 +81,6 @@ player_start_pos = [(100, 250), (SCREEN_WIDTH - 130, 250), (100, 470), (SCREEN_W
 player_colors = [RED, BLUE, LIME_GREEN, MAGENTA]
 CONTROLS_TEXT = "Use: WASD (Mover) | F (Interagir) | G (Usar Item)"
 
-# --- Lojas ---
 PACK_WIDTH, PACK_HEIGHT, PACK_Y, PACK_PADDING = 100, 60, SCREEN_HEIGHT - 120, 10
 start_shop_x = (SCREEN_WIDTH - (5 * PACK_WIDTH + 4 * PACK_PADDING)) // 2
 SHOP_PACKS_DATA = {
@@ -107,10 +107,10 @@ RESENHA_DURATION_SEC = 90
 RESENHA_MIN_INTERVAL_SEC = 240
 RESENHA_MAX_INTERVAL_SEC = 360
 
-# NOVO: Evento WASSUUUP
-EVENT_TYPES = ["WASSUUUP"]
-EVENT_DURATION_FRAMES = 20 * FPS  # Duração máxima (20s) se não atender
-EVENT_INTERVAL_FRAMES = 15 * FPS # Chance a cada 2 minutos
+# --- NOVO: Ambos Eventos ---
+EVENT_TYPES = ["WASSUUUP", "LA ELE"]
+EVENT_DURATION_FRAMES = 20 * FPS  # Duração de ambos (20s)
+EVENT_INTERVAL_FRAMES = 120 * FPS # Chance a cada 2 minutos
 
 # --- Rede ---
 def get_local_ip():
@@ -120,19 +120,10 @@ def get_local_ip():
         ip = s.getsockname()[0]
         s.close()
         return ip
-    except:
-        return "127.0.0.1"
-
+    except: return "127.0.0.1"
 def ip_to_code(ip):
-    try:
-        packed = socket.inet_aton(ip)
-        return packed.hex().upper()
-    except:
-        return "ERRO"
-
+    try: return socket.inet_aton(ip).hex().upper()
+    except: return "ERRO"
 def code_to_ip(code):
-    try:
-        packed = bytes.fromhex(code)
-        return socket.inet_ntoa(packed)
-    except:
-        return None
+    try: return socket.inet_ntoa(bytes.fromhex(code))
+    except: return None

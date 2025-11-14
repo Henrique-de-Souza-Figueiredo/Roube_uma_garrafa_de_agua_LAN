@@ -28,7 +28,7 @@ small_font = pygame.font.SysFont(None, 24)
 price_font = pygame.font.SysFont(None, 18)
 title_font = pygame.font.SysFont(None, 72)
 resenha_font = pygame.font.SysFont(None, 100, bold=True)
-wassup_font = pygame.font.SysFont('Arial', 120, bold=True)  # Fonte especial
+event_font = pygame.font.SysFont('Arial', 120, bold=True)  # Fonte para WASSUP/LAELE
 
 # Estado do Menu
 game_mode_state = 0
@@ -93,7 +93,7 @@ def draw_bottle(surface, bottle_data):
             surface.blit(q_surf, q_surf.get_rect(center=rect.center))
 
 
-def draw_player(surface, player_data):
+def draw_player(surface, player_data, game_state):
     if not player_data: return
     rect = pygame.Rect(player_data["rect_data"])
     color = player_data["color"]
@@ -113,12 +113,22 @@ def draw_player(surface, player_data):
 
     if player_data.get("tax_visual_timer", 0) > 0:
         tax_amount = player_data.get("last_tax_amount", 0)
-        msg = small_font.render(f"-${tax_amount:.2f} IMPOSTO!", True, RED)
+        msg = small_font.render(f"-${tax_amount:.0f} IMPOSTO!", True, RED)
         offset_y = (FPS * 3 - player_data["tax_visual_timer"]) * 0.5
         surface.blit(msg, msg.get_rect(center=(rect.centerx, rect.top - 25 - offset_y)))
 
+    # --- CORREÇÃO: "LA ELE" VISÍVEL ---
+    if game_state.get("active_event") == "LA ELE" and game_state.get("la_ele_player_id") == player_data["id"]:
+        # Pisca um X Branco com borda Preta (Visível em todas as cores)
+        if (pygame.time.get_ticks() // 150) % 2 == 0:
+            # Borda Preta
+            pygame.draw.line(surface, BLACK, rect.topleft, rect.bottomright, 7)
+            pygame.draw.line(surface, BLACK, rect.topright, rect.bottomleft, 7)
+            # Centro Branco
+            pygame.draw.line(surface, WHITE, rect.topleft, rect.bottomright, 3)
+            pygame.draw.line(surface, WHITE, rect.topright, rect.bottomleft, 3)
 
-def draw_base(surface, player_data):
+def draw_base(surface, player_data, game_state):
     if not player_data: return
     base_rect = pygame.Rect(player_data["base_rect_data"])
     color = player_data["color"]
@@ -131,13 +141,16 @@ def draw_base(surface, player_data):
     pygame.draw.rect(surface, btn_color, button_rect)
     pygame.draw.rect(surface, WHITE, button_rect, 1)
 
-    # --- NOVO: Desenha o Telefone ---
-    if player_data.get("controls_reversed", False):
+    # Telefone (Aparece durante WASSUUUP)
+    if game_state.get("active_event") == "WASSUUUP":
         phone_rect = pygame.Rect(player_data["phone_rect_data"])
-        # Pisca em amarelo para chamar atenção
         phone_color = YELLOW if (pygame.time.get_ticks() // 200) % 2 == 0 else BLACK
         pygame.draw.rect(surface, phone_color, phone_rect)
         pygame.draw.rect(surface, WHITE, phone_rect, 1)
+
+        if player_data.get("controls_reversed", False):
+            f_surf = small_font.render("F", True, WHITE)
+            surface.blit(f_surf, f_surf.get_rect(center=phone_rect.center))
 
     if player_data["shield_active"]:
         shield_surf = pygame.Surface(base_rect.size, pygame.SRCALPHA)
@@ -237,7 +250,7 @@ def draw_ui(surface, players_data_list, my_id):
         pos_x = base.left if my_id in [0, 2] else base.right - controls.get_width()
         surface.blit(controls, (pos_x, base.bottom + 5))
 
-        # --- NOVO: Aviso de Controles Invertidos ---
+        # Aviso de Controles Invertidos
         if p.get("controls_reversed", False):
             warn_surf = font.render("CONTROLES INVERTIDOS!", True, RED)
             surface.blit(warn_surf, warn_surf.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30)))
@@ -254,7 +267,7 @@ def draw_ui(surface, players_data_list, my_id):
     for i, p in enumerate(players_data_list):
         if not p: continue
         name = p['name'][:10]
-        money_txt = font.render(f"{name}: ${p['money']:.2f}", True, WHITE)
+        money_txt = font.render(f"{name}: ${p['money']:.0f}", True, WHITE)
         rays_txt = small_font.render(f"Raios: {p['consumables'].get('Raio Orbital', 0)}", True, WHITE)
         shield_txt = get_shield_txt(p)
         x, y = positions[i]
@@ -305,26 +318,40 @@ def draw_resenha_overlay(surface):
     surface.blit(info_surf, info_rect)
 
 
-# --- NOVO: Visual do WASSUUUP ---
-def draw_event_overlay(surface, active_event):
+# Visual dos Eventos Aleatórios
+def draw_event_overlay(surface, game_state):
+    active_event = game_state.get("active_event")
+    if not active_event: return
+
+    global last_event_pos_change, current_event_pos
+    now = pygame.time.get_ticks()
+
+    if now - last_event_pos_change > 300:
+        x = random.randint(50, SCREEN_WIDTH - 400)
+        y = random.randint(50, SCREEN_HEIGHT - 200)
+        current_event_pos = (x, y)
+        last_event_pos_change = now
+
     if active_event == "WASSUUUP":
-        global last_event_pos_change, current_event_pos
-        now = pygame.time.get_ticks()
-
-        # Pisca rápido e em novo lugar
-        if now - last_event_pos_change > 300:
-            x = random.randint(50, SCREEN_WIDTH - 400)
-            y = random.randint(50, SCREEN_HEIGHT - 200)
-            current_event_pos = (x, y)
-            last_event_pos_change = now
-
         text = "WASSUUUP?!"
         color = random.choice([WHITE, LIME_GREEN, YELLOW])
-        surf_border = wassup_font.render(text, True, BLACK)
-        surf = wassup_font.render(text, True, color)
-
+        surf_border = event_font.render(text, True, BLACK)
+        surf = event_font.render(text, True, color)
         surface.blit(surf_border, (current_event_pos[0] + 5, current_event_pos[1] + 5))
         surface.blit(surf, current_event_pos)
+
+    elif active_event == "LA ELE":
+        text = "LA ELE?!"
+        color = random.choice([WHITE, RED, MAGENTA])
+        surf_border = event_font.render(text, True, BLACK)
+        surf = event_font.render(text, True, color)
+        surface.blit(surf_border, (current_event_pos[0] + 5, current_event_pos[1] + 5))
+        surface.blit(surf, current_event_pos)
+
+        # Timer da "Batata Quente"
+        timer_sec = game_state.get("event_duration", 0) // FPS
+        timer_surf = font.render(f"Tempo: {timer_sec}s", True, RED)
+        surface.blit(timer_surf, timer_surf.get_rect(center=(SCREEN_WIDTH // 2, 100)))
 
 
 def redraw_window(surface, game_state, my_id):
@@ -343,22 +370,20 @@ def redraw_window(surface, game_state, my_id):
     for b_data in bottles:
         draw_bottle(surface, b_data)
         b_rect = pygame.Rect(b_data["rect_data"])
-        price = price_font.render(f"${b_data['value']:.2f}", True, YELLOW)
+        price = price_font.render(f"${b_data['value']:.0f}", True, YELLOW)
         price_rect = price.get_rect(centerx=b_rect.centerx, bottom=b_rect.top - 2)
         surface.blit(price, price_rect)
 
     for p_data in players:
-        draw_base(surface, p_data)
-        draw_player(surface, p_data)
+        draw_base(surface, p_data, game_state)  # Passa game_state
+        draw_player(surface, p_data, game_state)  # Passa game_state
 
     draw_ui(surface, players, my_id)
 
-    # Desenha Overlays de Eventos
     if game_state.get("resenha_active", False):
         draw_resenha_overlay(surface)
 
-    # CHAMA A NOVA FUNÇÃO
-    draw_event_overlay(surface, game_state.get("active_event"))
+    draw_event_overlay(surface, game_state)
 
     mouse = pygame.mouse.get_pos()
     hover = None
@@ -405,13 +430,12 @@ def draw_game_over_screen(surface, ranking_data_list):
     pygame.display.flip()
 
 
-# --- LOOP PRINCIPAL COM MENU ---
+# --- LOOP PRINCIPAL ---
 def main():
     global game_mode_state, player_name_input, code_input, is_host, my_lan_code, connection_status
 
     running = True
 
-    # Elementos do Menu
     btn_join_game = Button("ENTRAR (CODIGO)", SCREEN_WIDTH // 2 - 200, 400, 400, 60, BLUE)
     btn_create_game = Button("CRIAR PARTIDA", SCREEN_WIDTH // 2 - 200, 500, 400, 60, GREEN)
 
@@ -427,7 +451,6 @@ def main():
     game_over = False
     final_ranking = []
 
-    # --- LOOP DE ESTADOS ---
     while running:
         clock.tick(FPS)
 
@@ -436,7 +459,7 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
                 if is_host and server:
-                    server.server_running = False  # Tenta fechar o server
+                    server.server_running = False
 
         # --- ESTADO 0: MENU ---
         if game_mode_state == 0:
@@ -560,9 +583,10 @@ def main():
             keys = pygame.key.get_pressed()
 
             try:
-                if not n.send({'keys': keys, 'interact': interact, 'use_item': use_item}):
-                    print("Falha ao enviar dados.")
-                    running = False
+                if n:
+                    if not n.send({'keys': keys, 'interact': interact, 'use_item': use_item}):
+                        print("Falha ao enviar dados.")
+                        running = False
             except:
                 running = False
 
