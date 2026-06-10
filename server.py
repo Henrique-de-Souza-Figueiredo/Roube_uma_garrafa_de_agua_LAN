@@ -730,49 +730,67 @@ def start_server_logic():
     server_running = True
     ip = get_local_ip()
     code = ip_to_code(ip)
-    print(f"--- SERVIDOR INICIADO ---\nIP Local: {ip}\nCÓDIGO DA SALA: {code}\n-------------------------")
+    print(f"--- SERVIDOR INICIADO ---\nIP Local: {ip}\nCODIGO DA SALA: {code}\n-------------------------")
+
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.settimeout(1.0)
     try:
         s.bind(("0.0.0.0", PORT))
         s.listen(MAX_PLAYERS)
     except socket.error as e:
         print(f"Erro bind: {e}")
+        server_running = False
+        s.close()
         return
-    threading.Thread(target=game_logic_thread, daemon=True).start()
-    while server_running:
-        try:
-            conn, addr = s.accept()
-            if game_over:
-                conn.close();
-                continue
-            new_player_id = -1
-            with clients_lock:
-                for i in range(MAX_PLAYERS):
-                    if players[i] is None and i not in client_connections:
-                        new_player_id = i;
-                        break
-            if new_player_id != -1:
-                try:
-                    conn.send(pickle.dumps(new_player_id))
-                    player_name_bytes = conn.recv(1024)
-                    player_name = pickle.loads(player_name_bytes)
-                    start_x, start_y = player_start_pos[new_player_id]
-                    color = player_colors[new_player_id]
-                    base_data = player_base_rects_data[new_player_id]
-                    players[new_player_id] = Player(start_x, start_y, color, base_data, new_player_id, player_name)
-                    with clients_lock:
-                        output_queues[new_player_id] = Queue()
-                        client_connections[new_player_id] = conn
-                    threading.Thread(target=client_listener_thread, args=(conn, new_player_id), daemon=True).start()
-                    threading.Thread(target=client_sender_thread, args=(conn, new_player_id), daemon=True).start()
-                    print(f"Jogador {new_player_id + 1} ({player_name}) conectado.")
-                except:
-                    conn.close()
-            else:
-                conn.close()
-        except:
-            pass
 
+    threading.Thread(target=game_logic_thread, daemon=True).start()
+    try:
+        while server_running:
+            try:
+                conn, addr = s.accept()
+                if game_over:
+                    conn.close()
+                    continue
+
+                new_player_id = -1
+                with clients_lock:
+                    for i in range(MAX_PLAYERS):
+                        if players[i] is None and i not in client_connections:
+                            new_player_id = i
+                            break
+
+                if new_player_id != -1:
+                    try:
+                        conn.send(pickle.dumps(new_player_id))
+                        player_name_bytes = conn.recv(1024)
+                        player_name = pickle.loads(player_name_bytes)
+                        start_x, start_y = player_start_pos[new_player_id]
+                        color = player_colors[new_player_id]
+                        base_data = player_base_rects_data[new_player_id]
+                        players[new_player_id] = Player(start_x, start_y, color, base_data, new_player_id, player_name)
+                        with clients_lock:
+                            output_queues[new_player_id] = Queue()
+                            client_connections[new_player_id] = conn
+                        threading.Thread(target=client_listener_thread, args=(conn, new_player_id), daemon=True).start()
+                        threading.Thread(target=client_sender_thread, args=(conn, new_player_id), daemon=True).start()
+                        print(f"Jogador {new_player_id + 1} ({player_name}) conectado.")
+                    except Exception as e:
+                        print(f"Erro ao registrar jogador: {e}")
+                        conn.close()
+                else:
+                    conn.close()
+            except socket.timeout:
+                continue
+            except OSError as e:
+                if server_running:
+                    print(f"Erro no socket do servidor: {e}")
+                break
+            except Exception as e:
+                print(f"Erro no loop do servidor: {e}")
+    finally:
+        server_running = False
+        s.close()
 
 if __name__ == "__main__":
     start_server_logic()
